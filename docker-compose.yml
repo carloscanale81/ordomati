@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  ordomati:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ordomati
+    restart: unless-stopped
+    ports:
+      # Puerto Web: interfaz de usuario accesible desde el navegador
+      - "3000:3000"
+      # Puerto MCP: protocolo Model Context Protocol accesible para LLMs (Cursor, Antigravity, Cline, etc.)
+      - "3002:3002"
+      # NOTA DE ARQUITECTURA DE SEGURIDAD:
+      # El puerto 3001 de la API REST interna NO se expone al host.
+      # Permanece estrictamente interno dentro del contenedor y accesible solo para el servidor MCP.
+    environment:
+      - NODE_ENV=production
+      - HOST=127.0.0.1
+      - PORT=3001
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=3002
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=3000
+      - API_URL=http://127.0.0.1:3001
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

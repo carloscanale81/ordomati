@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.gitignore
+.gemini
+*.log
+.system_generated
+.vscode
+.idea
+npm-debug.log*
