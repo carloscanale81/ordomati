@@ -53,13 +53,11 @@ const SAMPLE_REPORT_STRINGS: FlavourReportStrings = {
   weightColumn: 'Redistributed Weight'
 };
 
-test('Flavours registry exposes Match Soccer MVP and Race Driver definitions', () => {
-  assert.equal(FLAVOUR_LIST.length, 2);
+test('Flavours registry exposes Match Soccer MVP definition', () => {
+  assert.equal(FLAVOUR_LIST.length, 1);
   assert.ok(isFlavourId('match-soccer-mvp'));
-  assert.ok(isFlavourId('race-driver'));
   assert.ok(!isFlavourId('ordomachine'));
   assert.equal(FLAVOUR_DEFINITIONS['match-soccer-mvp'].watermarkVariant, 'soccer-ball');
-  assert.equal(FLAVOUR_DEFINITIONS['race-driver'].watermarkVariant, 'race-car');
 });
 
 test('Flavour case serialize & parse round-trip preserves sourceUrl and rejects mismatches', () => {
@@ -76,35 +74,30 @@ test('Flavour case serialize & parse round-trip preserves sourceUrl and rejects 
   assert.equal(restored.dataset?.elements.length, initial.dataset.elements.length);
 
   assert.throws(
-    () => parseFlavourCase(parsedJson, 'race-driver'),
+    () => parseFlavourCase({ ...parsedJson, flavour: 'unknown-flavour' as any }, 'match-soccer-mvp'),
     (err: Error) => err.message === 'FLAVOUR_MISMATCH'
   );
 });
 
 test('Flavour case import also accepts standalone Ordomatics dataset files', () => {
   const standaloneDataset = createDefaultDataset();
-  const imported = parseFlavourCase(standaloneDataset, 'race-driver');
+  const imported = parseFlavourCase(standaloneDataset, 'match-soccer-mvp');
 
-  assert.equal(imported.flavour, 'race-driver');
+  assert.equal(imported.flavour, 'match-soccer-mvp');
   assert.equal(imported.sourceUrl, '');
   assert.equal(imported.dataset?.characteristics.length, standaloneDataset.characteristics.length);
 });
 
 test('buildFlavourReportHtml builds escaped readable HTML with ranking when dataset exists', () => {
-  const raceCase = createInitialFlavourState('race-driver');
-  raceCase.sourceUrl = 'https://example.com/race?id=10&tag="heat"';
-  raceCase.dataset = createDefaultDataset();
+  const soccerCase = createInitialFlavourState('match-soccer-mvp');
+  soccerCase.sourceUrl = 'https://example.com/match?id=10&tag="final"';
+  soccerCase.dataset = createDefaultDataset();
 
-  const html = buildFlavourReportHtml(raceCase, SAMPLE_REPORT_STRINGS, 'en');
+  const html = buildFlavourReportHtml(soccerCase, SAMPLE_REPORT_STRINGS, 'en');
 
   assert.ok(html.includes('<!DOCTYPE html>'));
-  assert.ok(html.includes('Race Driver'));
-  assert.ok(html.includes('https://example.com/race?id=10&amp;tag=&quot;heat&quot;'));
+  assert.ok(html.includes('https://example.com/match?id=10&amp;tag=&quot;final&quot;'));
   assert.ok(html.includes('Evaluated Elements Ranking'));
-  const forbiddenAcronym = new RegExp(`\\b${'f'}${'1'}\\b`, 'i');
-  const forbiddenSeries = new RegExp(`${'form'}${'ula'}\\s*${'1'}`, 'i');
-  assert.ok(!forbiddenAcronym.test(html), 'Race Driver report must avoid restricted series acronym');
-  assert.ok(!forbiddenSeries.test(html), 'Race Driver report must avoid restricted series title');
 });
 
 test('Match Soccer MVP defaults to 2007644 Spain vs Argentina URL', () => {

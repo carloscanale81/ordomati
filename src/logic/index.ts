@@ -8,3 +8,4 @@ export * from './flavours';
 export * from './matchScraper';
 export * from './soccerAnalysis';
 export * from './teamColors';
+export * from './mathExpression';

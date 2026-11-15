@@ -3,6 +3,7 @@ import {
   computeInverseContextualValue,
   evaluateCustomPropagation
 } from './affinity';
+import { evaluateMathExpression } from './mathExpression';
 import {
   normalizeCorrelationMatrix,
   computeReorderedOWA,
@@ -33,16 +34,18 @@ export interface SoccerBlockingConfig {
   customExpr?: string;
 }
 
-export type SoccerRelativeAdjustmentType = 'none' | 'byMinutes' | 'byTouches' | 'byMean';
+export type SoccerRelativeAdjustmentType = 'none' | 'byMinutes' | 'byTouches' | 'byMean' | 'custom';
 
 export interface SoccerRelativeAdjustmentConfig {
   type: SoccerRelativeAdjustmentType;
+  customExpr?: string;
 }
 
-export type SoccerEqualizationType = 'max' | 'sum' | 'none';
+export type SoccerEqualizationType = 'max' | 'sum' | 'none' | 'custom';
 
 export interface SoccerEqualizationConfig {
   type: SoccerEqualizationType;
+  customExpr?: string;
 }
 
 export const DEFAULT_SOCCER_PROPAGATION: SoccerPropagationConfig = { type: 'maxRatio' };
@@ -142,7 +145,7 @@ export interface SoccerAggregatedAnalysis {
   dimAffinityMatrix: number[][]; // [12 x 12]
   normalizedAffinity: number[][]; // [12 x 12] C'
   owaConfig: SoccerOwaConfig;
-  equalizationConfig?: SoccerEqualizationConfig;
+  equalizationConfig?: SoccerEqualizationConfig | SoccerEqualizationConfig[];
   scores: number[]; // Aggregated score A_final per player (11)
   ranking: number[]; // Indices of players sorted by score descending
   mvpPlayer: MatchPlayer; // Player with highest score in active segment
@@ -928,8 +931,8 @@ export const computeSoccerDimensionalAnalysis = (
     }
   }
 
-  // 3. Matriz de Afinidad A mediante Función de Propagación F_P:
-  // Por defecto (maxRatio): diagonal = 1, resto = passes(i, j) / maxPasses.
+  // 3. Affinity Matrix A via Propagation Function F_P:
+  // Default (maxRatio): diagonal = 1, off-diagonal = passes(i, j) / maxPasses.
   const A: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
   const propType = propagationConfig.type || 'maxRatio';
   const L = (typeof propagationConfig.limit === 'number' && propagationConfig.limit > 0)
@@ -972,7 +975,7 @@ export const computeSoccerDimensionalAnalysis = (
     }
   }
 
-  // 4. Función de Bloqueo: Por defecto sin bloqueo (A^AI = A)
+  // 4. Blocking Function: Default without blocking (A^AI = A)
   const AAI: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
   const blockType = blockingConfig.type || 'none';
   const blockThreshold = typeof blockingConfig.threshold === 'number' ? blockingConfig.threshold : 0.15;
@@ -984,6 +987,13 @@ export const computeSoccerDimensionalAnalysis = (
       } else {
         if (blockType === 'threshold') {
           AAI[i][j] = A[i][j] < blockThreshold ? 0.0 : A[i][j];
+        } else if (blockType === 'custom') {
+          const res = evaluateMathExpression(
+            blockingConfig.customExpr || 'a < theta ? 0 : a',
+            { a: A[i][j], theta: blockThreshold, umbral: blockThreshold, i, j },
+            A[i][j]
+          );
+          AAI[i][j] = Math.max(0, Math.min(1, Number.isFinite(res) ? res : A[i][j]));
         } else {
           // 'none'
           AAI[i][j] = A[i][j];
@@ -992,7 +1002,7 @@ export const computeSoccerDimensionalAnalysis = (
     }
   }
 
-  // 5. Función de Sinergia: Por defecto sin sinergia (A^C = A^AI)
+  // 5. Synergy Function: Default without synergy (A^C = A^AI)
   const AC: number[][] = computeContextualAffinity(AAI, synergyConfig);
   // Guarantee unit diagonal is strictly preserved
   for (let i = 0; i < n; i++) {
@@ -1194,7 +1204,7 @@ export const computeSoccerDimensionalAnalysis = (
     }
   }
 
-  // 7. Ajuste Relativo: Ponderación de V^C (por defecto 'none', ca = 1)
+  // 7. Relative Adjustment: Weighting of V^C (default 'none', ca = 1)
   const ca: number[] = Array(n).fill(1.0);
   const relType = relativeConfig.type || 'none';
 
@@ -1215,6 +1225,32 @@ export const computeSoccerDimensionalAnalysis = (
     const meanVC = VC.reduce((a, b) => a + b, 0) / (n || 1);
     for (let i = 0; i < n; i++) {
       ca[i] = meanVC > 0 ? 1.0 / meanVC : 1.0;
+    }
+  } else if (relType === 'custom') {
+    const playerTouches = players.map((_, i) => {
+      let tCount = 0;
+      for (let j = 0; j < n; j++) tCount += passCounts[i][j] + passCounts[j][i];
+      return tCount;
+    });
+    const avgT = playerTouches.reduce((a, b) => a + b, 0) / (n || 1);
+    const meanVC = VC.reduce((a, b) => a + b, 0) / (n || 1);
+    for (let i = 0; i < n; i++) {
+      const res = evaluateMathExpression(
+        relativeConfig.customExpr || '1',
+        {
+          m: segment.duration,
+          minutos: segment.duration,
+          T: 90,
+          minutos_totales: 90,
+          toques: playerTouches[i],
+          media_toques: avgT,
+          vc: VC[i],
+          media_vc: meanVC,
+          i
+        },
+        1.0
+      );
+      ca[i] = Math.max(0, Number.isFinite(res) ? res : 1.0);
     }
   }
 
@@ -1437,7 +1473,7 @@ export const computeSoccerAggregatedAnalysis = (
   segment: TimelineSegment,
   owaConfig: SoccerOwaConfig = { type: 'average', weights: SOCCER_OWA_PRESETS.average },
   dimAffinityMatrix: number[][] = DEFAULT_SOCCER_DIM_AFFINITY,
-  equalizationConfig: SoccerEqualizationConfig = { type: 'max' }
+  equalizationConfig: SoccerEqualizationConfig | SoccerEqualizationConfig[] = { type: 'max' }
 ): SoccerAggregatedAnalysis => {
   const players = segment.activePlayers;
   const n = players.length;
@@ -1462,11 +1498,12 @@ export const computeSoccerAggregatedAnalysis = (
     }
   }
 
-  // 1b. Ajuste por equiparación (por defecto 'max'):
-  const eqType = equalizationConfig?.type || 'max';
+  // 1b. Equalization adjustment (default 'max' globally or per dimension):
   const equalizedV: number[][] = Array.from({ length: n }, () => Array(m).fill(0));
 
   for (let j = 0; j < m; j++) {
+    const dimEqConfig = Array.isArray(equalizationConfig) ? equalizationConfig[j] : equalizationConfig;
+    const eqType = dimEqConfig?.type || 'max';
     if (eqType === 'max') {
       let maxVal = 0;
       for (let i = 0; i < n; i++) {
@@ -1480,6 +1517,27 @@ export const computeSoccerAggregatedAnalysis = (
       for (let i = 0; i < n; i++) sumVal += V[i][j];
       for (let i = 0; i < n; i++) {
         equalizedV[i][j] = sumVal > 0 ? Number((V[i][j] / sumVal).toFixed(4)) : 0;
+      }
+    } else if (eqType === 'custom') {
+      let maxVal = 0;
+      let sumVal = 0;
+      for (let i = 0; i < n; i++) {
+        if (V[i][j] > maxVal) maxVal = V[i][j];
+        sumVal += V[i][j];
+      }
+      for (let i = 0; i < n; i++) {
+        const res = evaluateMathExpression(
+          dimEqConfig?.customExpr || 'vp / max_vp',
+          {
+            vp: V[i][j],
+            max_vp: maxVal || 1,
+            sum_vp: sumVal || 1,
+            i,
+            j
+          },
+          V[i][j]
+        );
+        equalizedV[i][j] = Math.max(0, Number.isFinite(res) ? Number(res.toFixed(4)) : V[i][j]);
       }
     } else {
       // 'none'

@@ -5,7 +5,7 @@
 
 export type ElementName = string;
 
-export type CharacteristicType = 'quantitative' | 'qualitative';
+export type CharacteristicType = 'quantitative' | 'qualitative' | 'adjustment';
 export type Granularity = 3 | 5 | 7 | number;
 export type Semantics = 'core' | 'support';
 
@@ -18,6 +18,13 @@ export interface PropagationConfig {
   customExpr?: string; // Mathematical expression f(d, L, L1, L2), e.g. 'exp(-d / L)'
 }
 
+export type BlockingType = 'standard' | 'custom';
+
+export interface BlockingConfig {
+  type: BlockingType;
+  customExpr?: string; // Mathematical expression f(a, S, vb, i, j), e.g. 'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))'
+}
+
 export type SynergyType = 'none' | 'factor' | 'custom';
 
 export interface SynergyConfig {
@@ -26,7 +33,7 @@ export interface SynergyConfig {
   customExpr?: string; // Mathematical expression f(a, k), e.g. 'min(1, a * k)'
 }
 
-export type NormType = 'maximum' | 'target';
+export type NormType = 'none' | 'maximum' | 'target';
 
 export interface AdjustmentConfig {
   targetValue?: 'vp' | 'vc'; // Base target value used for adjustment and aggregation ('vp': Own Value, 'vc': Contextual Value)
@@ -41,15 +48,15 @@ export type ScaleSource = 'auto' | 'vp' | 'vc' | 'raw';
 export type AffinityEntryStage = 'd' | 'a' | 'aa' | 'ac';
 
 export interface CharacteristicLocks {
-  vp?: boolean; // Lock on Valor Propio
-  vc?: boolean; // Lock on Valor Contextual
-  d?: boolean; // Lock on Matriz de Distancias (Detail)
-  fp?: boolean; // Lock on Función de Propagación (Detail)
-  a?: boolean; // Lock on Matriz de Afinidad (Detail)
-  vb?: boolean; // Lock on Función de Bloqueo / Vector Base (Detail)
-  aa?: boolean; // Lock on Matriz Autoinducida (Detail)
-  fs?: boolean; // Lock on Función de Sinergia (Detail)
-  ac_detail?: boolean; // Lock on Matriz de Afinidad Contextual (Detail)
+  vp?: boolean; // Lock on Own Value (Valor Propio)
+  vc?: boolean; // Lock on Contextual Value (Valor Contextual)
+  d?: boolean; // Lock on Distance Matrix (Detail)
+  fp?: boolean; // Lock on Propagation Function (Detail)
+  a?: boolean; // Lock on Affinity Matrix (Detail)
+  vb?: boolean; // Lock on Blocking Function / Base Vector (Detail)
+  aa?: boolean; // Lock on Autoinduced Matrix (Detail)
+  fs?: boolean; // Lock on Synergy Function (Detail)
+  ac_detail?: boolean; // Lock on Contextual Affinity Matrix (Detail)
 }
 
 export interface Characteristic {
@@ -68,6 +75,7 @@ export interface Characteristic {
   rawInputs: string[];
   d: (number | null)[][]; // Distance matrix D (n x n), off-diagonal entries can be null (no data)
   vb: number[]; // Blocking vector V^B (n)
+  block?: BlockingConfig; // Blocking function configuration F_B
   prop: PropagationConfig; // Propagation function configuration F_P
   syn: SynergyConfig; // Synergy function configuration F_S
   adj: AdjustmentConfig; // Relative adjustment and scale equalization parameters

@@ -284,25 +284,54 @@ export const evaluateElementInput = (
       finalTokenVal = beta;
       sum += beta;
       validCount++;
-    } else {
-      // Quantitative characteristic: evaluate physical value in [min, max]
-      let lo: number;
-      let hi: number;
-
+    } else if (char.type === 'adjustment') {
+      // Adjustment characteristic: directly evaluate numeric or interval values
+      let val = 0;
       if (parsed.t === 'real') {
-        lo = hi = parsed.v;
+        val = parsed.v;
         traceStr = `Precise → ${parsed.v}`;
         traceKey = 'trace.val.precise';
         traceParams = { val: parsed.v };
       } else if (parsed.t === 'int') {
-        lo = parsed.a;
-        hi = parsed.b;
+        val = (parsed.a + parsed.b) / 2;
+        traceStr = `Interval [${parsed.a},${parsed.b}] → Avg=${val.toFixed(2)}`;
+        traceKey = 'trace.val.interval';
+        traceParams = { lo: parsed.a, hi: parsed.b, avg: val.toFixed(2) };
+      } else {
+        tokenResults.push({
+          raw: tok,
+          trace: 'Ajuste solo admite valores numéricos o intervalos',
+          traceKey: 'trace.err.adjustmentNumericOnly',
+          valid: false
+        });
+        return;
+      }
+
+      finalTokenVal = val;
+      sum += val;
+      validCount++;
+    } else {
+      // Quantitative characteristic: evaluate physical value within allowed interval [min, max]
+      let lo: number;
+      let hi: number;
+
+      if (parsed.t === 'real') {
+        lo = hi = Math.max(min, Math.min(max, parsed.v));
+        traceStr = parsed.v < min || parsed.v > max
+          ? `${parsed.v} (Clamped [${min},${max}] → ${lo})`
+          : `Precise → ${parsed.v}`;
+        traceKey = 'trace.val.precise';
+        traceParams = { val: lo };
+      } else if (parsed.t === 'int') {
+        lo = Math.max(min, Math.min(max, parsed.a));
+        hi = Math.max(min, Math.min(max, parsed.b));
         const avg = ((lo + hi) / 2).toFixed(2);
         traceStr = `Interval [${lo},${hi}] → Avg=${avg}`;
         traceKey = 'trace.val.interval';
         traceParams = { lo, hi, avg };
       } else {
         // Linguistic term provided for quantitative variable: dereference using core or support semantics
+        // and scale directly from [0, 1] into physical interval [min, max]
         if (parsed.pure) {
           const sDef = getLabelFuzzySets(parsed.g)[parsed.i];
           const x1 = (char.sem || 'core') === 'support' ? sDef.a : sDef.b;
@@ -313,6 +342,7 @@ export const evaluateElementInput = (
           traceKey = 'trace.val.label';
           traceParams = { lo: lo.toFixed(2), hi: hi.toFixed(2) };
         } else {
+          // 2-tuple scaled directly from [0, 1] to [min, max]
           const x = (parsed.i + parsed.gamma) / (parsed.g - 1);
           lo = hi = scale(x);
           traceStr = `2-tuple → ${lo.toFixed(2)}`;
@@ -337,7 +367,7 @@ export const evaluateElementInput = (
     });
   });
 
-  // Aggregate multiple values/evaluations and normalize to [0, 1] for V^P
+  // Aggregate multiple values/evaluations
   let finalVal = 0;
   let summaryTrace = 'Empty → 0';
 
@@ -348,12 +378,15 @@ export const evaluateElementInput = (
       finalVal = avgBeta / (g - 1);
       finalVal = Math.max(0, Math.min(1, isNaN(finalVal) ? 0 : finalVal));
       summaryTrace = `μ(β)=${avgBeta.toFixed(2)} ⇒ V^P = ${finalVal.toFixed(4)}`;
-    } else {
+    } else if (char.type === 'adjustment') {
       const avg = sum / validCount;
-      // Normalize physical value to V^P in [0, 1]
-      finalVal = (avg - min) / (max - min || 1);
-      finalVal = Math.max(0, Math.min(1, isNaN(finalVal) ? 0 : finalVal));
-      summaryTrace = `μ(val)=${avg.toFixed(2)} ⇒ Norm = ${finalVal.toFixed(4)}`;
+      finalVal = isNaN(avg) ? 0 : avg;
+      summaryTrace = `μ(val)=${avg.toFixed(2)} ⇒ Valor = ${finalVal.toFixed(2)}`;
+    } else {
+      // Quantitative: min and max define permitted interval; value remains in physical scale
+      const avg = sum / validCount;
+      finalVal = isNaN(avg) ? 0 : Math.max(min, Math.min(max, avg));
+      summaryTrace = `μ(val)=${avg.toFixed(2)} ⇒ V^P = ${finalVal.toFixed(2)}`;
     }
   }
 

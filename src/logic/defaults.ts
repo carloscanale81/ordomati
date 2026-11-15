@@ -1,8 +1,20 @@
 import { OrdomaticaDataset } from './types';
 
 /**
+ * Creates an empty Ordomatics dataset without any preloaded case data.
+ * Used as the initial blank slate for the main Ordomachine workspace.
+ */
+export const createEmptyDataset = (): OrdomaticaDataset => ({
+  elements: [],
+  characteristics: [],
+  cMatrix: [],
+  owa: [],
+  decimalPrecision: 2
+});
+
+/**
  * Creates the standard default Ordomatics dataset.
- * Used for initialization in both Web UI, unit tests, and headless MCP/API environments.
+ * Used for initialization in unit tests and headless MCP/API environments.
  * Dimensions are labeled D1, D2 by default.
  */
 export const createDefaultDataset = (): OrdomaticaDataset => ({
@@ -23,9 +35,10 @@ export const createDefaultDataset = (): OrdomaticaDataset => ({
         [20, 34, 2, 0]
       ],
       vb: [1, 0, 0.2, 0.5],
+      block: { type: 'standard' },
       prop: { type: 'triangular', limit: 10, l1: 5 },
       syn: { type: 'none', k: 1 },
-      adj: { targetValue: 'vc', byPop: -1, normType: 'maximum', obj: 1 },
+      adj: { targetValue: 'vc', byPop: -1, normType: 'none', obj: 1 },
       calcTarget: 'vc'
     },
     {
@@ -43,9 +56,10 @@ export const createDefaultDataset = (): OrdomaticaDataset => ({
         [null, null, null, 0]
       ],
       vb: [0, 0, 0, 0],
+      block: { type: 'standard' },
       prop: { type: 'triangular', limit: 10, l1: 5 },
       syn: { type: 'none', k: 1 },
-      adj: { targetValue: 'vc', byPop: -1, normType: 'maximum', obj: 1 },
+      adj: { targetValue: 'vc', byPop: -1, normType: 'none', obj: 1 },
       calcTarget: 'vc'
     }
   ],
@@ -54,5 +68,5 @@ export const createDefaultDataset = (): OrdomaticaDataset => ({
     [0.3, 1]
   ],
   owa: [1, 0.9],
-  decimalPrecision: 4
+  decimalPrecision: 2
 });

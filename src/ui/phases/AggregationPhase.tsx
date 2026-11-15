@@ -49,8 +49,11 @@ const FlowConnector: React.FC<{ label?: React.ReactNode }> = ({ label }) => (
 export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg, onUpdateDataset }) => {
   const { t } = useI18n();
   const { elements, characteristics, cMatrix, owa } = dataset;
-  const precision = dataset.decimalPrecision ?? 4;
-  const maxScore = Math.max(...agg.A_final, 1);
+
+  const aggregableChars = characteristics.filter(c => c.type !== 'adjustment');
+  const aggregableIndices = characteristics
+    .map((c, i) => (c.type !== 'adjustment' ? i : -1))
+    .filter(i => i !== -1);
 
   // Configuration Card collapse state
   const [isConfigOpen, setIsConfigOpen] = useState(true);
@@ -70,6 +73,24 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
 
   const isGraphMode = (key: string) => Boolean(viewModes[key]);
 
+  if (elements.length === 0 || aggregableChars.length === 0) {
+    return (
+      <div className="w-full py-12 px-6 rounded-2xl bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 text-center space-y-2">
+        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          {aggregableChars.length === 0 && characteristics.length > 0
+            ? t('agg.noAggregableChars')
+            : t('agg.emptyTitle')}
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {t('agg.emptyHelp')}
+        </p>
+      </div>
+    );
+  }
+
+  const precision = dataset.decimalPrecision ?? 2;
+  const maxScore = Math.max(...(agg.A_final || [0]), 1);
+
   const toggleDetail = (key: AggDetailType) => {
     setActiveDetail(prev => (prev === key ? null : key));
   };
@@ -82,18 +103,23 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
     });
   };
 
-  const handleUpdateCMatrix = (i: number, j: number, val: number | null) => {
+  const handleUpdateCMatrix = (dispI: number, dispJ: number, val: number | null) => {
+    const origI = aggregableIndices[dispI];
+    const origJ = aggregableIndices[dispJ];
+    if (origI === undefined || origJ === undefined) return;
     onUpdateDataset(prev => {
       const nextC = prev.cMatrix.map(row => [...row]);
-      nextC[i][j] = val ?? 0;
+      nextC[origI][origJ] = val ?? 0;
       return { ...prev, cMatrix: nextC };
     });
   };
 
-  const handleUpdateOwa = (_: number, j: number, val: number | null) => {
+  const handleUpdateOwa = (_: number, dispJ: number, val: number | null) => {
+    const origJ = aggregableIndices[dispJ];
+    if (origJ === undefined) return;
     onUpdateDataset(prev => {
       const nextOwa = [...prev.owa];
-      nextOwa[j] = val ?? 0;
+      nextOwa[origJ] = val ?? 0;
       return { ...prev, owa: nextOwa };
     });
   };
@@ -147,8 +173,12 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
     }
   }[sortOrder];
 
-  const charNames = characteristics.map(c => c.name);
-  const owaSum = owa.reduce((acc, v) => acc + (Number.isFinite(v) ? v : 0), 0);
+  const charNames = aggregableChars.map(c => c.name);
+  const displayedCMatrix = aggregableIndices.map(i =>
+    aggregableIndices.map(j => cMatrix[i]?.[j] ?? (i === j ? 1 : 0))
+  );
+  const displayedOwa = aggregableIndices.map(j => owa[j] ?? 1);
+  const owaSum = displayedOwa.reduce((acc, v) => acc + (Number.isFinite(v) ? v : 0), 0);
 
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-500">
@@ -189,12 +219,12 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
                     {t('agg.cMatrix.title')}
                   </h4>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {t('agg.cMatrix.desc', { m: characteristics.length })}
+                    {t('agg.cMatrix.desc', { m: aggregableChars.length })}
                   </p>
                 </div>
               </div>
               <MatrixEditor
-                data={cMatrix}
+                data={displayedCMatrix}
                 rows={charNames}
                 cols={charNames}
                 onChange={handleUpdateCMatrix}
@@ -210,7 +240,7 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
                     {t('agg.owa.title')}
                   </h4>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {t('agg.owa.desc', { m: characteristics.length })}
+                    {t('agg.owa.desc', { m: aggregableChars.length })}
                   </p>
                 </div>
                 <span
@@ -224,9 +254,9 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
                 </span>
               </div>
               <MatrixEditor
-                data={[owa]}
+                data={[displayedOwa]}
                 rows={['w']}
-                cols={characteristics.map((_, i) => `Pos ${i + 1}`)}
+                cols={aggregableChars.map((_, i) => `Pos ${i + 1}`)}
                 onChange={handleUpdateOwa}
                 decimalPrecision={precision}
               />
@@ -304,7 +334,7 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
                 {isGraphMode('det-cn') ? (
                   <MatrixGraph
                     elements={charNames}
-                    elementImages={characteristics.map(c => c.image || '')}
+                    elementImages={aggregableChars.map(c => c.image || '')}
                     matrix={agg.Cn}
                     theme="indigo"
                     isDimension={true}
@@ -381,7 +411,7 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
               <AggregationCalculationPlayer
                 elements={elements}
                 elementImages={dataset.elementImages}
-                characteristics={characteristics}
+                characteristics={aggregableChars}
                 V={agg.V}
                 RWA={agg.RWA}
                 A_final={agg.A_final}
@@ -402,7 +432,7 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
             className="flex-1 flex flex-col"
           >
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              {t('agg.card.vDesc', { n: elements.length, m: characteristics.length })}
+              {t('agg.card.vDesc', { n: elements.length, m: aggregableChars.length })}
             </p>
 
             <div className="flex-1 overflow-x-auto no-scrollbar">
@@ -440,7 +470,7 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
             className="flex-1 flex flex-col"
           >
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              {t('agg.card.rwaDesc', { n: elements.length, m: characteristics.length })}
+              {t('agg.card.rwaDesc', { n: elements.length, m: aggregableChars.length })}
             </p>
 
             {isGraphMode('rwa') ? (
@@ -466,7 +496,7 @@ export const AggregationPhase: React.FC<AggregationPhaseProps> = ({ dataset, agg
                             key={j}
                             style={{ width: `${(1 / rowValues.length) * 100}%` }}
                             className="h-full border-r border-white/40 dark:border-gray-900/40 last:border-r-0 transition-all"
-                            title={`${characteristics[j]?.name}: ${v.toFixed(precision)}`}
+                            title={`${aggregableChars[j]?.name}: ${v.toFixed(precision)}`}
                           >
                             <div
                               className="h-full bg-indigo-500"

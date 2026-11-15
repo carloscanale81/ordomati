@@ -6,17 +6,17 @@ export { DEFAULT_SOCCER_MATCH_URL };
 /**
  * Supported domain-specific flavour identifiers.
  */
-export type FlavourId = 'match-soccer-mvp' | 'race-driver';
+export type FlavourId = 'match-soccer-mvp';
 
 /**
  * Top-level navigation view identifiers across the application.
  */
-export type AppMenuView = 'ordomachine' | FlavourId;
+export type AppMenuView = 'ordomachine' | 'function-syntax' | FlavourId;
 
 /**
  * Visual watermark illustration variant rendered behind flavour views.
  */
-export type FlavourWatermarkVariant = 'soccer-ball' | 'race-car';
+export type FlavourWatermarkVariant = 'soccer-ball';
 
 /**
  * Static configuration describing each flavour entry and its UI bindings.
@@ -48,24 +48,18 @@ export const FLAVOUR_DEFINITIONS: Record<FlavourId, FlavourDefinition> = {
     id: 'match-soccer-mvp',
     filePrefix: 'match_soccer_mvp',
     watermarkVariant: 'soccer-ball'
-  },
-  'race-driver': {
-    id: 'race-driver',
-    filePrefix: 'race_driver',
-    watermarkVariant: 'race-car'
   }
 };
 
 export const FLAVOUR_LIST: FlavourDefinition[] = [
-  FLAVOUR_DEFINITIONS['match-soccer-mvp'],
-  FLAVOUR_DEFINITIONS['race-driver']
+  FLAVOUR_DEFINITIONS['match-soccer-mvp']
 ];
 
 /**
  * Type guard verifying whether an arbitrary value matches a known FlavourId.
  */
 export const isFlavourId = (value: unknown): value is FlavourId =>
-  value === 'match-soccer-mvp' || value === 'race-driver';
+  value === 'match-soccer-mvp';
 
 /**
  * Creates a clean initial analysis case state for a given flavour.

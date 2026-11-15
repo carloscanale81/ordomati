@@ -98,9 +98,10 @@ export const ConfigPhase: React.FC<ConfigPhaseProps> = ({ dataset, onUpdateDatas
         rawInputs: Array(n).fill(''),
         d: Array(n).fill(null).map((_, ri) => Array(n).fill(null).map((_, ci) => ri === ci ? 0 : null)),
         vb: Array(n).fill(0),
+        block: { type: 'standard' },
         prop: { type: 'triangular', limit: 10, l1: 5 },
         syn: { type: 'none', k: 1 },
-        adj: { byPop: -1, normType: 'maximum', obj: 1 }
+        adj: { byPop: -1, normType: 'none', obj: 1 }
       };
 
       const m = prev.characteristics.length;
@@ -304,7 +305,7 @@ export const ConfigPhase: React.FC<ConfigPhaseProps> = ({ dataset, onUpdateDatas
               min="0"
               max="8"
               step="1"
-              value={dataset.decimalPrecision ?? 4}
+              value={dataset.decimalPrecision ?? 2}
               onChange={e => {
                 const val = parseInt(e.target.value, 10);
                 const clamped = isNaN(val) ? 4 : Math.max(0, Math.min(8, val));

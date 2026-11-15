@@ -1,28 +1,76 @@
 import React, { useState } from 'react';
-import { Target, Sparkles, Layers, Sliders, ChevronDown, ChevronUp, Trophy } from 'lucide-react';
+import { Target, Sparkles, Layers, Sliders, ChevronDown, ChevronUp, Trophy, Network, ToggleLeft, ToggleRight } from 'lucide-react';
 import { Card } from './Card';
-import { SoccerDimensionalAnalysis, SoccerConcept } from '../../logic/soccerAnalysis';
+import {
+  SoccerDimensionalAnalysis,
+  SoccerConcept,
+  SoccerPropagationConfig,
+  SoccerBlockingConfig,
+  SoccerRelativeAdjustmentConfig,
+  SoccerEqualizationConfig,
+  TimelineSegment
+} from '../../logic/soccerAnalysis';
 import { SynergyConfig } from '../../logic/types';
 import { useI18n } from '../i18n/I18nContext';
+import { SoccerPipelineFunctionsConfig, PipelineFunctionKey } from './SoccerPipelineFunctionsConfig';
+import { SoccerContextualAffinityPanel } from './SoccerContextualAffinityPanel';
 
 export interface SoccerDimensionCardProps {
   concept: SoccerConcept;
   conceptTitle: string;
   analysis: SoccerDimensionalAnalysis;
+  segment?: TimelineSegment;
+  crestUrl?: string;
   synergyConfig?: SynergyConfig;
   onUpdateSynergy?: (next: SynergyConfig) => void;
+  propagationConfig?: SoccerPropagationConfig;
+  onUpdatePropagation?: (next: SoccerPropagationConfig) => void;
+  blockingConfig?: SoccerBlockingConfig;
+  onUpdateBlocking?: (next: SoccerBlockingConfig) => void;
+  relativeConfig?: SoccerRelativeAdjustmentConfig;
+  onUpdateRelativeAdjustment?: (next: SoccerRelativeAdjustmentConfig) => void;
+  equalizationConfig?: SoccerEqualizationConfig;
+  onUpdateEqualization?: (next: SoccerEqualizationConfig) => void;
+  overrideFlags?: Partial<Record<PipelineFunctionKey, boolean>>;
+  onToggleOverride?: (fnKey: PipelineFunctionKey, enabled: boolean) => void;
+  showPipelineFunctions?: boolean;
   onRecalculate?: () => void;
   defaultCollapsed?: boolean;
 }
 
 export const SoccerDimensionCard: React.FC<SoccerDimensionCardProps> = ({
+  concept,
   conceptTitle,
   analysis,
+  segment,
+  crestUrl,
+  synergyConfig,
+  onUpdateSynergy,
+  propagationConfig,
+  onUpdatePropagation,
+  blockingConfig,
+  onUpdateBlocking,
+  relativeConfig,
+  onUpdateRelativeAdjustment,
+  equalizationConfig,
+  onUpdateEqualization,
+  overrideFlags,
+  onToggleOverride,
+  showPipelineFunctions = false,
   onRecalculate,
   defaultCollapsed = false
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const isEs = language === 'es';
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+
+  const overrideOptions: { key: PipelineFunctionKey; label: string }[] = [
+    { key: 'propagation', label: isEs ? 'Propagación' : 'Propagation' },
+    { key: 'blocking', label: isEs ? 'Bloqueo' : 'Blocking' },
+    { key: 'synergy', label: isEs ? 'Sinergia' : 'Synergy' },
+    { key: 'relative', label: isEs ? 'Ajuste Relativo' : 'Relative Adj.' },
+    { key: 'equalization', label: isEs ? 'Equiparación' : 'Equalization' }
+  ];
 
   const { players, VC, VP, isCalculated } = analysis;
 
@@ -48,6 +96,20 @@ export const SoccerDimensionCard: React.FC<SoccerDimensionCardProps> = ({
     });
   }
   const mvpPlayer = topVpIdx !== -1 && highestVp > 0 ? players[topVpIdx] : null;
+
+  const hasAnyOverride = Boolean(
+    overrideFlags?.propagation ||
+    overrideFlags?.blocking ||
+    overrideFlags?.synergy ||
+    overrideFlags?.relative ||
+    overrideFlags?.equalization
+  );
+  const hasAffinityOverride = Boolean(
+    overrideFlags?.propagation ||
+    overrideFlags?.blocking ||
+    overrideFlags?.synergy
+  );
+  const effectiveSegment = segment || analysis.segment;
 
   return (
     <Card
@@ -81,7 +143,83 @@ export const SoccerDimensionCard: React.FC<SoccerDimensionCardProps> = ({
       }
     >
       {!isCollapsed && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+        <div className="space-y-4">
+          {/* Overrides Bar */}
+          <div className="p-3 rounded-xl bg-gray-50/90 dark:bg-gray-900/60 border border-gray-200/90 dark:border-gray-800 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  {isEs ? 'Sobrescribir funciones específicas en esta dimensión:' : 'Override specific functions in this dimension:'}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {overrideOptions.map(opt => {
+                  const isOverridden = Boolean(overrideFlags?.[opt.key]);
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => onToggleOverride?.(opt.key, !isOverridden)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                        isOverridden
+                          ? 'bg-purple-600 text-white shadow-2xs hover:bg-purple-700'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-purple-300 hover:text-purple-600 dark:hover:text-purple-400'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isOverridden ? 'bg-white' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {hasAnyOverride && (
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+                <SoccerPipelineFunctionsConfig
+                  compact={true}
+                  visibleKeys={overrideFlags}
+                  propagationConfig={propagationConfig}
+                  onUpdatePropagation={onUpdatePropagation}
+                  blockingConfig={blockingConfig}
+                  onUpdateBlocking={onUpdateBlocking}
+                  synergyConfig={synergyConfig}
+                  onUpdateSynergy={onUpdateSynergy}
+                  relativeConfig={relativeConfig}
+                  onUpdateRelativeAdjustment={onUpdateRelativeAdjustment}
+                  equalizationConfig={equalizationConfig}
+                  onUpdateEqualization={onUpdateEqualization}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Dimension-specific Contextual Affinity Panel (when propagation, blocking, or synergy overridden) */}
+          {hasAffinityOverride && effectiveSegment && (
+            <div className="p-4 rounded-xl bg-gray-50/80 dark:bg-gray-900/60 border border-purple-200/80 dark:border-purple-900/40 space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-800">
+                <Network className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <h4 className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                  {isEs ? `Afinidad Contextual Específica (${conceptTitle})` : `Specific Contextual Affinity (${conceptTitle})`}
+                </h4>
+              </div>
+              <SoccerContextualAffinityPanel
+                segment={effectiveSegment}
+                players={players}
+                AC={analysis.AC}
+                passCounts={analysis.passCounts}
+                teamKey={effectiveSegment.team}
+                crestUrl={crestUrl}
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
           {/* Pillar 1: Valor Propio (V^P) */}
           <div className="flex flex-col h-full rounded-xl p-3.5 bg-gray-50/70 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-1.5 pb-2 mb-2 border-b border-gray-200 dark:border-gray-800">
@@ -220,6 +358,7 @@ export const SoccerDimensionCard: React.FC<SoccerDimensionCardProps> = ({
               })}
             </div>
           </div>
+        </div>
         </div>
       )}
     </Card>

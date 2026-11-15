@@ -69,3 +69,51 @@ test('calculateOrdomatica executes cleanly on full case', () => {
     assert.ok(Number.isFinite(score) && score >= 0, 'Score is finite and non-negative');
   });
 });
+
+test('calculateOrdomatica: adjustment dimension is ignored in Phase 3 aggregation and used for relative contrast', () => {
+  const dataset = createDefaultDataset();
+  // Add an adjustment characteristic
+  dataset.characteristics.push({
+    id: 100,
+    name: 'Poblacion',
+    type: 'adjustment',
+    min: 0,
+    max: 100,
+    g: 5,
+    rawInputs: ['100', '200', '50', '25'],
+    d: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+    vb: [0, 0, 0, 0],
+    prop: { type: 'inhibited', limit: 0 },
+    syn: { type: 'none', k: 1 },
+    adj: { byPop: -1, normType: 'maximum', obj: 1 }
+  });
+
+  // Set the first quantitative characteristic to use the adjustment dimension (idx 2) for relative contrast
+  dataset.characteristics[0].adj.byPop = 2;
+
+  const result = calculateOrdomatica(dataset);
+
+  // All 3 characteristics exist in chars
+  assert.equal(result.chars.length, 3);
+  // Aggregated Phase 3 evaluation matrix V only contains aggregable characteristics (2 columns)
+  assert.equal(result.agg.V[0].length, 2);
+  assert.equal(result.agg.Cn.length, 2);
+  assert.equal(result.agg.RWA[0].length, 2);
+
+  // The first characteristic has relative adjustment ca = 1 / populationContextualValues
+  assert.ok(result.chars[0].ca[0] === 1 / 100);
+  assert.ok(result.chars[0].ca[1] === 1 / 200);
+});
+
+test('calculateOrdomatica: equalization normType none keeps values as-is without scaling', () => {
+  const dataset = createDefaultDataset();
+  // Set characteristic 0 to normType: 'none'
+  dataset.characteristics[0].adj.normType = 'none';
+  dataset.characteristics[0].adj.byPop = -1;
+
+  const result = calculateOrdomatica(dataset);
+  const char0 = result.chars[0];
+
+  assert.equal(char0.cn, 1, 'Scale normalization factor cn is 1 for none');
+  assert.deepEqual(char0.VCRN, char0.VCR, 'VCRN matches VCR exactly without scaling when normType is none');
+});

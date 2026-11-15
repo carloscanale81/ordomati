@@ -36,10 +36,39 @@ export const calculateOrdomatica = (dataset: OrdomaticaDataset): OrdomaticaCalcu
   const n = elements.length;
   const m = characteristics.length;
 
+  // Handle empty dataset without calculation errors
+  if (n === 0 || m === 0) {
+    return {
+      chars: [],
+      agg: {
+        V: [],
+        Cn: [],
+        OWAp: [],
+        RWA: [],
+        A_final: [],
+        ranking: []
+      }
+    };
+  }
+
   // Step 1: Process each characteristic individually
   const intermediateChars = characteristics.map(char => {
     // 1.1: Evaluate heterogeneous inputs and compute base input vector
     const { parsedInputs, vp: inputValues } = computeCharacteristicVP(char, n);
+
+    if (char.type === 'adjustment') {
+      const zeroMatrix = Array(n).fill(0).map(() => Array(n).fill(0));
+      return {
+        char,
+        parsedInputs,
+        vp: inputValues,
+        A: zeroMatrix,
+        AA: zeroMatrix,
+        AC: zeroMatrix,
+        VC: inputValues,
+        isQuasiInverse: false
+      };
+    }
 
     // 1.2: Compute distance propagation affinity matrix A (or use direct input if entry stage is downstream)
     const entryStage = char.affinityEntryStage || 'd';
@@ -56,7 +85,7 @@ export const calculateOrdomatica = (dataset: OrdomaticaDataset): OrdomaticaCalcu
     if (['aa', 'ac'].includes(entryStage) && char.customAA && char.customAA.length === n) {
       AA = char.customAA;
     } else {
-      AA = computeAutoinducedAffinity(A, char.vb || []);
+      AA = computeAutoinducedAffinity(A, char.vb || [], char.block);
     }
 
     // 1.4: Apply synergy modulation F_S to obtain contextual affinity A^C (or use direct input)
@@ -135,6 +164,24 @@ export const calculateOrdomatica = (dataset: OrdomaticaDataset): OrdomaticaCalcu
   });
 
   const charsProcessed: ProcessedCharacteristic[] = intermediateChars.map((item, idx) => {
+    if (item.char.type === 'adjustment') {
+      return {
+        id: item.char.id,
+        name: item.char.name,
+        parsedInputs: item.parsedInputs,
+        vp: item.vp,
+        A: item.A,
+        AA: item.AA,
+        AC: item.AC,
+        VC: item.VC,
+        ca: Array(n).fill(1),
+        VCR: item.vp,
+        cn: 1,
+        VCRN: item.vp,
+        isQuasiInverse: false
+      };
+    }
+
     const baseVector = baseVectors[idx];
     const adj = computeCharacteristicAdjustment(item.char, baseVector, baseVectors);
 
@@ -161,8 +208,29 @@ export const calculateOrdomatica = (dataset: OrdomaticaDataset): OrdomaticaCalcu
   });
 
   // Step 3: Multi-criteria aggregation and final alternative ranking
-  const VCRN_by_char = charsProcessed.map(c => c.VCRN);
-  const agg = aggregateResults(n, m, VCRN_by_char, cMatrix, owa);
+  // Adjustment dimensions are strictly ignored in Phase 3 aggregation
+  const aggregableIndices = characteristics
+    .map((c, i) => (c.type !== 'adjustment' ? i : -1))
+    .filter(i => i !== -1);
+
+  let agg;
+  if (aggregableIndices.length === 0) {
+    agg = {
+      V: [],
+      Cn: [],
+      OWAp: [],
+      RWA: [],
+      A_final: [],
+      ranking: []
+    };
+  } else {
+    const subVCRN = aggregableIndices.map(i => charsProcessed[i].VCRN);
+    const subCMatrix = aggregableIndices.map(i =>
+      aggregableIndices.map(j => cMatrix[i]?.[j] ?? (i === j ? 1 : 0))
+    );
+    const subOwa = aggregableIndices.map(i => owa[i] ?? 1);
+    agg = aggregateResults(n, aggregableIndices.length, subVCRN, subCMatrix, subOwa);
+  }
 
   return {
     chars: charsProcessed,

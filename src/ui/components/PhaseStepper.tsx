@@ -1,7 +1,9 @@
 import React from 'react';
 import { Settings, Columns3, Layers, Check } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
-import { Characteristic } from '../../logic/types';
+import { Characteristic, ProcessedCharacteristic } from '../../logic/types';
+import { computeCharacteristicVP } from '../../logic/fuzzy';
+import { MicroTargetChart } from './MicroTargetChart';
 
 export interface PhaseStepperProps {
   activePhase: number;
@@ -9,6 +11,8 @@ export interface PhaseStepperProps {
   characteristics?: Characteristic[];
   activeCharIdx?: number;
   onSelectCharIdx?: (idx: number) => void;
+  processedChars?: ProcessedCharacteristic[];
+  elementsCount?: number;
 }
 
 export const PhaseStepper: React.FC<PhaseStepperProps> = ({
@@ -16,7 +20,9 @@ export const PhaseStepper: React.FC<PhaseStepperProps> = ({
   onSelectPhase,
   characteristics,
   activeCharIdx,
-  onSelectCharIdx
+  onSelectCharIdx,
+  processedChars,
+  elementsCount = 0
 }) => {
   const { t } = useI18n();
 
@@ -118,6 +124,26 @@ export const PhaseStepper: React.FC<PhaseStepperProps> = ({
               <div className="ml-7 pl-1 my-2 flex flex-col gap-1.5 animate-in fade-in duration-300">
                 {characteristics.map((char, cIdx) => {
                   const isCharActive = activePhase === 1 && activeCharIdx === cIdx;
+                  const isQualOrQuant = char.type === 'quantitative' || char.type === 'qualitative';
+
+                  const proc = processedChars?.[cIdx];
+                  const charValues =
+                    proc?.vp && proc.vp.length > 0
+                      ? proc.vp
+                      : computeCharacteristicVP(char, elementsCount || 0).vp;
+
+                  const hasCharInputs = Boolean(
+                    char?.rawInputs &&
+                    char.rawInputs.some(inp => typeof inp === 'string' && inp.trim().length > 0)
+                  );
+                  const hasData =
+                    hasCharInputs &&
+                    charValues.length > 0 &&
+                    charValues.some(v => typeof v === 'number' && !isNaN(v));
+
+                  const minVal = char.min ?? 0;
+                  const maxVal = char.max ?? (char.type === 'qualitative' ? 1 : 100);
+
                   return (
                     <button
                       key={char.id ?? cIdx}
@@ -127,22 +153,49 @@ export const PhaseStepper: React.FC<PhaseStepperProps> = ({
                         onSelectCharIdx?.(cIdx);
                         onSelectPhase(1);
                       }}
-                      className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-all text-left group cursor-pointer ${
+                      className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition-all text-left group cursor-pointer w-full ${
                         isCharActive
                           ? 'bg-blue-600 text-white shadow-xs font-semibold'
                           : 'text-gray-600 dark:text-gray-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50/70 dark:hover:bg-blue-950/40 font-medium'
                       }`}
                       title={char.name}
                     >
-                      <span className="truncate">{char.name || `D${cIdx + 1}`}</span>
                       <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-mono shrink-0 ml-1.5 ${
+                        className={`truncate ${
+                          isQualOrQuant ? 'shrink-0 max-w-[42%]' : 'flex-1 min-w-0'
+                        }`}
+                      >
+                        {char.name || `D${cIdx + 1}`}
+                      </span>
+
+                      {/* Micro summary chart occupies all the free remaining width between name and type tag */}
+                      {isQualOrQuant && (
+                        <div className="flex-1 min-w-[32px] mx-2.5 h-4 flex items-center">
+                          <MicroTargetChart
+                            values={charValues}
+                            hasData={hasData}
+                            isActive={isCharActive}
+                            min={minVal}
+                            max={maxVal}
+                            height={16}
+                            responsive={true}
+                            noDataTitle={t('char.pagination.noData')}
+                          />
+                        </div>
+                      )}
+
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-mono shrink-0 ${
                           isCharActive
                             ? 'bg-blue-700/60 text-blue-100'
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/60 group-hover:text-blue-700 dark:group-hover:text-blue-300'
                         }`}
                       >
-                        {char.type === 'quantitative' ? t('char.config.type.quantShort') : t('char.config.type.qualShort')}
+                        {char.type === 'quantitative'
+                          ? t('char.config.type.quantShort')
+                          : char.type === 'adjustment'
+                          ? t('char.config.type.adjShort')
+                          : t('char.config.type.qualShort')}
                       </span>
                     </button>
                   );

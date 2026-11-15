@@ -9,6 +9,73 @@ export interface MatrixEditorProps {
   decimalPrecision?: number;
 }
 
+interface MatrixCellInputProps {
+  value: number | null | undefined;
+  onChange?: (val: number | null) => void;
+}
+
+const MatrixCellInput: React.FC<MatrixCellInputProps> = ({ value, onChange }) => {
+  const isFocusedRef = React.useRef(false);
+  const [text, setText] = React.useState<string>(
+    typeof value === 'number' && Number.isFinite(value) ? String(value) : ''
+  );
+
+  React.useEffect(() => {
+    if (!isFocusedRef.current) {
+      setText(typeof value === 'number' && Number.isFinite(value) ? String(value) : '');
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Replace comma with dot automatically so either key inputs the dot separator
+    const clean = e.target.value.replace(',', '.');
+    if (!/^-?\d*\.?\d*$/.test(clean) && clean !== '') return;
+    setText(clean);
+
+    const trimmed = clean.trim();
+    if (trimmed === '' || trimmed === '-') {
+      onChange?.(null);
+    } else {
+      const parsed = parseFloat(trimmed);
+      if (!isNaN(parsed) && Number.isFinite(parsed)) {
+        onChange?.(parsed);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    isFocusedRef.current = false;
+    const clean = text.trim().replace(',', '.');
+    if (clean === '' || clean === '-') {
+      setText('');
+      onChange?.(null);
+    } else {
+      const parsed = parseFloat(clean);
+      if (!isNaN(parsed) && Number.isFinite(parsed)) {
+        setText(String(parsed));
+        onChange?.(parsed);
+      } else {
+        setText(typeof value === 'number' && Number.isFinite(value) ? String(value) : '');
+      }
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      placeholder="-"
+      onFocus={() => {
+        isFocusedRef.current = true;
+      }}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      className="w-full p-2 text-center font-mono text-sm font-normal text-gray-800 dark:text-gray-100 tabular-nums focus:outline-none focus:bg-blue-50/40 dark:focus:bg-blue-900/30 focus:ring-1 focus:ring-blue-500 transition-colors bg-transparent placeholder-gray-400 dark:placeholder-gray-600"
+    />
+  );
+};
+
 export const MatrixEditor: React.FC<MatrixEditorProps> = ({
   data,
   rows,
@@ -46,21 +113,9 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({
                       {typeof val === 'number' && Number.isFinite(val) ? val.toFixed(decimalPrecision) : '-'}
                     </div>
                   ) : (
-                    <input
-                      type="number"
-                      step="any"
-                      value={typeof val === 'number' && Number.isFinite(val) ? val : ''}
-                      placeholder="-"
-                      onChange={e => {
-                        const trimmed = e.target.value.trim();
-                        if (trimmed === '') {
-                          onChange?.(i, j, null);
-                        } else {
-                          const parsed = parseFloat(trimmed);
-                          onChange?.(i, j, isNaN(parsed) ? null : parsed);
-                        }
-                      }}
-                      className="w-full p-2 text-center font-mono text-sm font-normal text-gray-800 dark:text-gray-100 tabular-nums focus:outline-none focus:bg-blue-50/40 dark:focus:bg-blue-900/30 focus:ring-1 focus:ring-blue-500 transition-colors bg-transparent placeholder-gray-400 dark:placeholder-gray-600"
+                    <MatrixCellInput
+                      value={val}
+                      onChange={nextVal => onChange?.(i, j, nextVal)}
                     />
                   )}
                 </td>

@@ -66,11 +66,11 @@ export const parseFlavourCase = (rawInput: unknown, expectedFlavour: FlavourId):
   const record = rawInput as Record<string, unknown>;
 
   if ('flavour' in record) {
-    if (!isFlavourId(record.flavour)) {
-      throw new Error('INVALID_FLAVOUR_CASE');
-    }
     if (record.flavour !== expectedFlavour) {
       throw new Error('FLAVOUR_MISMATCH');
+    }
+    if (!isFlavourId(record.flavour)) {
+      throw new Error('INVALID_FLAVOUR_CASE');
     }
     if (typeof record.sourceUrl !== 'string') {
       throw new Error('INVALID_FLAVOUR_CASE');

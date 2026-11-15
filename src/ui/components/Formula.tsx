@@ -26,7 +26,8 @@ function readBalancedBraces(input: string, openBraceIdx: number): { content: str
   };
 }
 
-function renderMathNodes(input: string, keyPrefix = 'm'): React.ReactNode[] {
+function renderMathNodes(input: string = '', keyPrefix = 'm'): React.ReactNode[] {
+  const safeInput = input || '';
   const nodes: React.ReactNode[] = [];
   let plain = '';
   let i = 0;
@@ -39,11 +40,11 @@ function renderMathNodes(input: string, keyPrefix = 'm'): React.ReactNode[] {
     }
   };
 
-  while (i < input.length) {
-    const ch = input[i];
+  while (i < safeInput.length) {
+    const ch = safeInput[i];
 
     // Render Unicode inverse and plus exponents with matching superscript metrics
-    if (input.startsWith('⁻¹', i)) {
+    if (safeInput.startsWith('⁻¹', i)) {
       flushPlain();
       nodes.push(
         <sup
@@ -122,11 +123,11 @@ function renderMathNodes(input: string, keyPrefix = 'm'): React.ReactNode[] {
 }
 
 export interface MathTextProps {
-  text: string;
+  text?: string;
   className?: string;
 }
 
 /** Renders text with inline math notation, converting `^` into superscripts and `_` into subscripts. */
 export const MathText: React.FC<MathTextProps> = ({ text, className }) => (
-  <span className={className}>{renderMathNodes(text)}</span>
+  <span className={className}>{renderMathNodes(text || '')}</span>
 );

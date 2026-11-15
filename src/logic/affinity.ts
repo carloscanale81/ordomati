@@ -1,4 +1,5 @@
-import { Characteristic, PropagationConfig, SynergyConfig } from './types';
+import { BlockingConfig, Characteristic, PropagationConfig, SynergyConfig } from './types';
+import { evaluateMathExpression } from './mathExpression';
 
 const MATH_SCOPE: Record<string, any> = {
   exp: Math.exp,
@@ -32,23 +33,8 @@ export const evaluateCustomPropagation = (
   expr: string
 ): number => {
   if (!expr || !expr.trim()) return 0;
-  try {
-    if (!/^[a-zA-Z0-9_\s.+\-*/%(),^]+$/.test(expr)) return 0;
-    const jsExpr = expr.replace(/\^/g, '**');
-    const fn = new Function(
-      ...MATH_KEYS,
-      'd',
-      'L',
-      'L1',
-      'L2',
-      `"use strict"; return (${jsExpr});`
-    );
-    const res = Number(fn(...MATH_VALS, d, limit, l1, limit));
-    if (!Number.isFinite(res)) return 0;
-    return Math.max(0, Math.min(1, res));
-  } catch {
-    return 0;
-  }
+  const res = evaluateMathExpression(expr, { d, L: limit, L1: l1, L2: limit }, 0);
+  return Math.max(0, Math.min(1, Number.isFinite(res) ? res : 0));
 };
 
 /**
@@ -103,22 +89,24 @@ export const computeAffinityMatrix = (d: (number | null | undefined)[][], prop: 
 };
 
 /**
- * Computes the Autoinduced Affinity Matrix A^A from affinity A and blocking vector V^B.
+ * Computes the Autoinduced Affinity Matrix A^A from affinity A and blocking vector V^B (or custom blocking function).
  * 
- * Mathematical Formulation:
- * 1. For each row i, compute total affinity S_i = sum_j(a_ij).
- * 2. If S_i - 1 < 1e-12 (element has no exterior affinities):
- *    Row i collapses to the identity vector (a_ii = 1, a_ij = 0 for j != i).
- * 3. Compute the internal self-retention coefficient:
- *    s_i = 1 - (1 - V^B_i) * (1 - 1 / S_i)
- *    - When V^B_i = 1 (full block), s_i = 1 (complete self-retention, no outward flow).
- *    - When V^B_i = 0 (no block), s_i = 1 / S_i (proportional balance).
- * 4. Populate autoinduced matrix:
- *    - Diagonal: a^A_ii = s_i
- *    - Non-diagonal: a^A_ij = [a_ij / (S_i - 1)] * (1 - s_i)
- *    This ensures that each row preserves unit conservation: sum_j(a^A_ij) = 1.
+ * Mathematical Formulation (Standard Blocking from Thesis):
+ * FB(A, V^B, i, j) =
+ *   - For i = j:   (1 / sum_k(a_ik))^(1 - v_i^b)
+ *   - For i != j:  [a_ij / (sum_k(a_ik) - 1)] * (1 - (1 / sum_k(a_ik))^(1 - v_i^b))
+ * 
+ * When v_i^b = 1 (full block), s_i = 1 (complete self-retention, a^A_ij = 0 for j != i).
+ * When v_i^b = 0 (no block), s_i = 1 / S_i (proportional balance a^A_ij = a_ij / S_i).
+ * Unit conservation is preserved analytically: sum_j(a^A_ij) = 1 for all rows.
  */
-export const computeAutoinducedAffinity = (A: number[][], vb: number[]): number[][] => {
+export const computeAutoinducedAffinity = (
+  A: number[][],
+  vb: number[],
+  blockConfig?: BlockingConfig
+): number[][] => {
+  const blockType = blockConfig?.type || 'standard';
+
   return A.map((row, i) => {
     const rowSum = row.reduce((acc, v) => acc + v, 0);
 
@@ -128,39 +116,64 @@ export const computeAutoinducedAffinity = (A: number[][], vb: number[]): number[
     }
 
     const blockFactor = vb[i] ?? 0;
-    const s_val = 1 - (1 - blockFactor) * (1 - 1 / rowSum);
+
+    if (blockType === 'custom' && blockConfig?.customExpr) {
+      const customExpr = blockConfig.customExpr;
+      return row.map((val, j) => {
+        const s_val = Math.pow(1 / rowSum, 1 - blockFactor);
+        const defaultVal = i === j ? s_val : (val / (rowSum - 1)) * (1 - s_val);
+        const scope = {
+          a: val,
+          aij: val,
+          S: rowSum,
+          s: rowSum,
+          sum: rowSum,
+          vb: blockFactor,
+          v: blockFactor,
+          i,
+          j
+        };
+        const res = evaluateMathExpression(customExpr, scope, defaultVal);
+        return Math.max(0, Number.isFinite(res) ? res : defaultVal);
+      });
+    }
+
+    // Standard blocking: power formula from doctoral thesis image
+    const s_val = Math.pow(1 / rowSum, 1 - blockFactor);
 
     return row.map((val, j) => (i === j ? s_val : (val / (rowSum - 1)) * (1 - s_val)));
   });
 };
 
 /**
- * Evaluates a custom synergy mathematical expression f(a, k).
- * Allowed variables: a (autoinduced affinity), k (synergy factor).
- * Supported math functions: exp, pow, sqrt, log, abs, min, max, sin, cos, pi, e.
+ * Evaluates a custom synergy mathematical expression.
+ * Supports both modern signature f(a) without k: evaluateCustomSynergy(a, expr, k?)
+ * and legacy signature: evaluateCustomSynergy(a, k, expr).
  */
-export const evaluateCustomSynergy = (
+export function evaluateCustomSynergy(a: number, expr: string, k?: number): number;
+export function evaluateCustomSynergy(a: number, k: number, expr: string): number;
+export function evaluateCustomSynergy(
   a: number,
-  k: number,
-  expr: string
-): number => {
-  if (!expr || !expr.trim()) return a;
-  try {
-    if (!/^[a-zA-Z0-9_\s.+\-*/%(),^]+$/.test(expr)) return a;
-    const jsExpr = expr.replace(/\^/g, '**');
-    const fn = new Function(
-      ...MATH_KEYS,
-      'a',
-      'k',
-      `"use strict"; return (${jsExpr});`
-    );
-    const res = Number(fn(...MATH_VALS, a, k));
-    if (!Number.isFinite(res)) return a;
-    return Math.max(0, res);
-  } catch {
-    return a;
+  first: string | number,
+  second?: string | number
+): number {
+  let expr = '';
+  let k: number | undefined;
+
+  if (typeof first === 'string') {
+    expr = first;
+    if (typeof second === 'number') k = second;
+  } else {
+    k = first;
+    if (typeof second === 'string') expr = second;
   }
-};
+
+  if (!expr || !expr.trim()) return a;
+  const scope: Record<string, number> = { a };
+  if (typeof k === 'number' && Number.isFinite(k)) scope.k = k;
+  const res = evaluateMathExpression(expr, scope, a);
+  return Math.max(0, Number.isFinite(res) ? res : a);
+}
 
 /**
  * Computes the Contextual Affinity Matrix A^C by applying synergy function F_S to A^A.
@@ -170,7 +183,7 @@ export const evaluateCustomSynergy = (
  * - Diagonal elements (self-affinity) remain unchanged: a^C_ii = a^A_ii.
  * - When synergy type is 'factor', non-diagonal entries are modulated:
  *   a^C_ij = max(0, a^A_ij * k)
- * - When synergy type is 'custom', user-defined function f(a, k) modulates non-diagonal entries.
+ * - When synergy type is 'custom', user-defined function f(a) modulates non-diagonal entries without factor k.
  * - When synergy type is 'none', the matrix remains identical: A^C = A^A.
  */
 export const computeContextualAffinity = (AA: number[][], syn: SynergyConfig): number[][] => {
@@ -179,7 +192,7 @@ export const computeContextualAffinity = (AA: number[][], syn: SynergyConfig): n
       if (i === j) return val;
       if (syn.type === 'factor') return Math.max(0, val * syn.k);
       if (syn.type === 'custom') {
-        return evaluateCustomSynergy(val, syn.k, syn.customExpr || 'min(1, a * k)');
+        return evaluateCustomSynergy(val, syn.customExpr || 'min(1, a * 1.2)', syn.k);
       }
       return val;
     })
@@ -562,15 +575,20 @@ export const computeCharacteristicAdjustment = (
 
   // Compute scale normalization factor
   let cn = 1;
-  if (char.adj.normType === 'target' && char.adj.obj > 0) {
+  let VCRN: number[];
+  if (char.adj.normType === 'none') {
+    cn = 1;
+    // None: keep values as-is without applying equalization
+    VCRN = [...VCR];
+  } else if (char.adj.normType === 'target' && char.adj.obj > 0) {
     cn = 1 / char.adj.obj;
+    VCRN = VCR.map(v => Math.min(1, Math.max(0, v * cn)));
   } else {
+    // 'maximum' (default)
     const maxVCR = Math.max(...VCR, 1e-9);
     cn = 1 / maxVCR;
+    VCRN = VCR.map(v => Math.min(1, Math.max(0, v * cn)));
   }
-
-  // Clip equiparated value in [0, 1]
-  const VCRN = VCR.map(v => Math.min(1, Math.max(0, v * cn)));
 
   return { ca, VCR, cn, VCRN };
 };

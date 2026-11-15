@@ -88,7 +88,7 @@ test('evaluateElementInput: evaluates qualitative with multigranularity 2-tuple'
   assert.ok(Math.abs(evalResult.val - 0.95) < 1e-4);
 });
 
-test('evaluateElementInput: supports independent dynamic min and manual max', () => {
+test('evaluateElementInput: quantitative retains physical scale within permitted min/max', () => {
   const char: Characteristic = {
     id: 2,
     name: 'Cuantitativa',
@@ -98,7 +98,7 @@ test('evaluateElementInput: supports independent dynamic min and manual max', ()
     minMode: 'dynamic', // dynamic min
     maxMode: 'manual',
     g: 5,
-    rawInputs: ['10', '20', '50'], // dynMin = 10, dynMax = 50
+    rawInputs: ['10', '20', '50'], // dynMin = 10, dynMax = 50 -> interval [10, 100]
     d: [[0]],
     vb: [0],
     prop: { type: 'triangular', limit: 10 },
@@ -106,10 +106,40 @@ test('evaluateElementInput: supports independent dynamic min and manual max', ()
     adj: { byPop: -1, normType: 'maximum', obj: 1 }
   };
 
-  // With min=10 and max=100: for input 55, norm = (55 - 10) / (100 - 10) = 45 / 90 = 0.5
+  // With min=10 and max=100: crisp input 55 stays in physical scale 55 within [10, 100]
   const res = evaluateElementInput('55', char);
   assert.strictEqual(res.tokens[0].valid, true);
-  assert.ok(Math.abs(res.val - 0.5) < 1e-4);
+  assert.strictEqual(res.val, 55);
+
+  // 2-tuple (M, 0)@5 has normalized ratio 2/4 = 0.5; scaled directly to [10, 100] = 10 + 90 * 0.5 = 55
+  const resTuple = evaluateElementInput('(M, 0)@5', char);
+  assert.strictEqual(resTuple.tokens[0].valid, true);
+  assert.strictEqual(resTuple.val, 55);
+});
+
+test('evaluateElementInput: adjustment dimension evaluates direct numeric and interval values', () => {
+  const char: Characteristic = {
+    id: 3,
+    name: 'Ajuste Poblacional',
+    type: 'adjustment',
+    min: 0,
+    max: 100,
+    g: 5,
+    rawInputs: [],
+    d: [[0]],
+    vb: [0],
+    prop: { type: 'inhibited', limit: 0 },
+    syn: { type: 'none', k: 1 },
+    adj: { byPop: -1, normType: 'maximum', obj: 1 }
+  };
+
+  const resReal = evaluateElementInput('42.5', char);
+  assert.strictEqual(resReal.tokens[0].valid, true);
+  assert.strictEqual(resReal.val, 42.5);
+
+  const resInt = evaluateElementInput('[10, 20]', char);
+  assert.strictEqual(resInt.tokens[0].valid, true);
+  assert.strictEqual(resInt.val, 15);
 });
 
 test('custom propagation and synergy evaluate custom math functions', async () => {

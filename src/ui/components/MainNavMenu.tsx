@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Code2 } from 'lucide-react';
 import { AppMenuView, FLAVOUR_LIST, FlavourId, isFlavourId } from '../../logic/flavours';
 import { FlavourIllustration } from './FlavourWatermark';
 import { useI18n } from '../i18n/I18nContext';
@@ -20,10 +20,6 @@ const FLAVOUR_MENU_META: Record<
   'match-soccer-mvp': {
     labelKey: 'header.menu.matchSoccerMvp',
     descKey: 'header.menu.matchSoccerMvpDesc'
-  },
-  'race-driver': {
-    labelKey: 'header.menu.raceDriver',
-    descKey: 'header.menu.raceDriverDesc'
   }
 };
 
@@ -137,9 +133,6 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({ activeView, onSelectVi
             aria-label={t('header.menu.flavours')}
             className="absolute left-0 top-full mt-2 w-64 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg shadow-gray-900/10 dark:shadow-black/40 p-1.5 z-50"
           >
-            <div className="px-2.5 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              {t('header.menu.flavoursDesc')}
-            </div>
             <div className="space-y-0.5">
               {FLAVOUR_LIST.map(flavour => {
                 const { labelKey, descKey } = FLAVOUR_MENU_META[flavour.id];
@@ -182,6 +175,30 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({ activeView, onSelectVi
           </div>
         )}
       </div>
+
+      {/* Function Syntax Documentation view */}
+      <button
+        type="button"
+        onClick={() => {
+          setIsFlavoursOpen(false);
+          onSelectView('function-syntax');
+        }}
+        aria-current={activeView === 'function-syntax' ? 'page' : undefined}
+        className={`${navItemBaseClass} ${
+          activeView === 'function-syntax'
+            ? 'text-blue-600 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-950/35'
+            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100/75 dark:hover:bg-gray-800/70'
+        }`}
+      >
+        <Code2 className="w-3.5 h-3.5" />
+        <span>{t('header.menu.functionSyntax')}</span>
+        {activeView === 'function-syntax' && (
+          <span
+            aria-hidden="true"
+            className="absolute left-2.5 right-2.5 -bottom-1 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400"
+          />
+        )}
+      </button>
     </nav>
   );
 };

@@ -1,25 +1,15 @@
 import React, { useState } from 'react';
 import {
-  Sliders,
-  Lock,
   Table,
   Network,
   ChevronDown,
   ChevronUp,
-  Database,
-  Scale,
-  GitFork,
-  SlidersHorizontal
+  Database
 } from 'lucide-react';
 import {
   MatchPlayer,
-  TimelineSegment,
-  SoccerPropagationConfig,
-  SoccerBlockingConfig,
-  SoccerRelativeAdjustmentConfig,
-  SoccerEqualizationConfig
+  TimelineSegment
 } from '../../logic/soccerAnalysis';
-import { SynergyConfig } from '../../logic/types';
 import { useI18n } from '../i18n/I18nContext';
 import { SoccerPitchGraph } from './SoccerPitchGraph';
 
@@ -29,16 +19,6 @@ export interface SoccerContextualAffinityPanelProps {
   AC: number[][];
   passCounts?: number[][];
   teamKey?: 'home' | 'away';
-  propagationConfig?: SoccerPropagationConfig;
-  onUpdatePropagation?: (next: SoccerPropagationConfig) => void;
-  blockingConfig?: SoccerBlockingConfig;
-  onUpdateBlocking?: (next: SoccerBlockingConfig) => void;
-  synergyConfig: SynergyConfig;
-  onUpdateSynergy: (next: SynergyConfig) => void;
-  relativeConfig?: SoccerRelativeAdjustmentConfig;
-  onUpdateRelativeAdjustment?: (next: SoccerRelativeAdjustmentConfig) => void;
-  equalizationConfig?: SoccerEqualizationConfig;
-  onUpdateEqualization?: (next: SoccerEqualizationConfig) => void;
   crestUrl?: string;
   className?: string;
 }
@@ -49,16 +29,6 @@ export const SoccerContextualAffinityPanel: React.FC<SoccerContextualAffinityPan
   AC,
   passCounts,
   teamKey = 'home',
-  propagationConfig = { type: 'maxRatio' },
-  onUpdatePropagation,
-  blockingConfig = { type: 'none' },
-  onUpdateBlocking,
-  synergyConfig = { type: 'none', k: 1.0 },
-  onUpdateSynergy,
-  relativeConfig = { type: 'none' },
-  onUpdateRelativeAdjustment,
-  equalizationConfig = { type: 'max' },
-  onUpdateEqualization,
   crestUrl,
   className = ''
 }) => {
@@ -70,225 +40,7 @@ export const SoccerContextualAffinityPanel: React.FC<SoccerContextualAffinityPan
     <div
       className={`rounded-2xl p-4 bg-gray-50/70 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 space-y-4 ${className}`}
     >
-      {/* 1. Configuration of the 5 Functions: Propagación, Bloqueo, Sinergia, Ajuste Relativo, Ajuste por Equiparación */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-        {/* Box 1: Función de Propagación F_P (Default: maxRatio) */}
-        <div className="flex flex-col justify-between p-3 rounded-xl bg-white dark:bg-gray-800/90 border border-purple-200 dark:border-purple-900/60 shadow-2xs">
-          <div className="flex items-center gap-1.5 mb-2">
-            <GitFork className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
-              {t('soccer.affinity.propagationTitle')}
-            </span>
-          </div>
-
-          <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
-            <select
-              value={propagationConfig.type || 'maxRatio'}
-              onChange={e => onUpdatePropagation?.({ ...propagationConfig, type: e.target.value as any })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer font-medium"
-            >
-              <option value="maxRatio">{t('soccer.affinity.propagationTypeMaxRatio')}</option>
-              <option value="triangular">{t('soccer.affinity.propagationTypeTriangular')}</option>
-              <option value="rectangular">{t('soccer.affinity.propagationTypeRectangular')}</option>
-              <option value="sinusoidal">{t('soccer.affinity.propagationTypeSinusoidal')}</option>
-              <option value="inhibited">{t('soccer.affinity.propagationTypeInhibited')}</option>
-              <option value="custom">{t('soccer.affinity.propagationTypeCustom')}</option>
-            </select>
-
-            {propagationConfig.type === 'custom' && (
-              <input
-                type="text"
-                value={propagationConfig.customExpr || 'd / L'}
-                onChange={e => onUpdatePropagation?.({ ...propagationConfig, customExpr: e.target.value })}
-                placeholder="d / L"
-                className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
-              />
-            )}
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {propagationConfig.type === 'triangular'
-                ? t('soccer.affinity.propagationDescTriangular')
-                : propagationConfig.type === 'rectangular'
-                ? t('soccer.affinity.propagationDescRectangular')
-                : propagationConfig.type === 'sinusoidal'
-                ? t('soccer.affinity.propagationDescSinusoidal')
-                : propagationConfig.type === 'inhibited'
-                ? t('soccer.affinity.propagationDescInhibited')
-                : propagationConfig.type === 'custom'
-                ? t('soccer.affinity.propagationDescCustom')
-                : t('soccer.affinity.propagationDescMaxRatio')}
-            </p>
-          </div>
-        </div>
-
-        {/* Box 2: Función de Bloqueo F_B (Default: none) */}
-        <div className="flex flex-col justify-between p-3 rounded-xl bg-white dark:bg-gray-800/90 border border-amber-200 dark:border-amber-900/60 shadow-2xs">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
-              {t('soccer.affinity.blockingTitle')}
-            </span>
-          </div>
-
-          <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
-            <select
-              value={blockingConfig.type || 'none'}
-              onChange={e => onUpdateBlocking?.({ ...blockingConfig, type: e.target.value as any })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer font-medium"
-            >
-              <option value="none">{t('soccer.affinity.blockingTypeNone')}</option>
-              <option value="threshold">{t('soccer.affinity.blockingTypeThreshold')}</option>
-            </select>
-
-            {blockingConfig.type === 'threshold' && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">θ =</span>
-                <input
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  max="1"
-                  value={blockingConfig.threshold ?? 0.15}
-                  onChange={e => {
-                    const parsed = parseFloat(e.target.value);
-                    onUpdateBlocking?.({ ...blockingConfig, threshold: isNaN(parsed) ? 0.15 : parsed });
-                  }}
-                  className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 text-center"
-                />
-              </div>
-            )}
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {blockingConfig.type === 'threshold'
-                ? t('soccer.affinity.blockingDescThreshold')
-                : t('soccer.affinity.blockingDescNone')}
-            </p>
-          </div>
-        </div>
-
-        {/* Box 3: Función de Sinergia F_S (Default: none) */}
-        <div className="flex flex-col justify-between p-3 rounded-xl bg-white dark:bg-gray-800/90 border border-blue-200 dark:border-blue-900/60 shadow-2xs">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Sliders className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
-              {t('soccer.dimension.synergyTitle')}
-            </span>
-          </div>
-
-          <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
-            <select
-              value={synergyConfig?.type || 'none'}
-              onChange={e => onUpdateSynergy({ ...synergyConfig, type: e.target.value as any })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer font-medium"
-            >
-              <option value="none">{t('soccer.dimension.synergyTypeNone')}</option>
-              <option value="factor">{t('soccer.dimension.synergyTypeFactor')}</option>
-              <option value="custom">{t('soccer.dimension.synergyTypeCustom')}</option>
-            </select>
-
-            {synergyConfig?.type === 'factor' && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">k =</span>
-                <input
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  max="2"
-                  value={synergyConfig.k ?? 1.0}
-                  onChange={e => {
-                    const parsed = parseFloat(e.target.value);
-                    onUpdateSynergy({ ...synergyConfig, k: isNaN(parsed) ? 1.0 : parsed });
-                  }}
-                  className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 text-center"
-                />
-              </div>
-            )}
-
-            {synergyConfig?.type === 'custom' && (
-              <input
-                type="text"
-                value={synergyConfig.customExpr || 'a * k'}
-                onChange={e => onUpdateSynergy({ ...synergyConfig, customExpr: e.target.value })}
-                placeholder="a * k"
-                className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            )}
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {synergyConfig?.type === 'factor'
-                ? 'Modula afinidad según factor k'
-                : synergyConfig?.type === 'custom'
-                ? 'Modula según fórmula personalizada'
-                : 'A^C = A^AI (sin sinergia)'}
-            </p>
-          </div>
-        </div>
-
-        {/* Box 4: Ajuste Relativo c_a (Default: none) */}
-        <div className="flex flex-col justify-between p-3 rounded-xl bg-white dark:bg-gray-800/90 border border-indigo-200 dark:border-indigo-900/60 shadow-2xs">
-          <div className="flex items-center gap-1.5 mb-2">
-            <SlidersHorizontal className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
-              {t('soccer.affinity.relativeTitle')}
-            </span>
-          </div>
-
-          <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
-            <select
-              value={relativeConfig.type || 'none'}
-              onChange={e => onUpdateRelativeAdjustment?.({ ...relativeConfig, type: e.target.value as any })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer font-medium"
-            >
-              <option value="none">{t('soccer.affinity.relativeTypeNone')}</option>
-              <option value="byMinutes">{t('soccer.affinity.relativeTypeMinutes')}</option>
-              <option value="byTouches">{t('soccer.affinity.relativeTypeTouches')}</option>
-              <option value="byMean">{t('soccer.affinity.relativeTypeMean')}</option>
-            </select>
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {relativeConfig.type === 'byMinutes'
-                ? t('soccer.affinity.relativeDescMinutes')
-                : relativeConfig.type === 'byTouches'
-                ? t('soccer.affinity.relativeDescTouches')
-                : relativeConfig.type === 'byMean'
-                ? t('soccer.affinity.relativeDescMean')
-                : t('soccer.affinity.relativeDescNone')}
-            </p>
-          </div>
-        </div>
-
-        {/* Box 5: Ajuste por Equiparación c_n (Default: max) */}
-        <div className="flex flex-col justify-between p-3 rounded-xl bg-white dark:bg-gray-800/90 border border-emerald-200 dark:border-emerald-900/60 shadow-2xs">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Scale className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
-              {t('soccer.affinity.equalizationTitle')}
-            </span>
-          </div>
-
-          <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
-            <select
-              value={equalizationConfig.type || 'max'}
-              onChange={e => onUpdateEqualization?.({ ...equalizationConfig, type: e.target.value as any })}
-              className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer font-medium"
-            >
-              <option value="max">{t('soccer.affinity.equalizationTypeMax')}</option>
-              <option value="sum">{t('soccer.affinity.equalizationTypeSum')}</option>
-              <option value="none">{t('soccer.affinity.equalizationTypeNone')}</option>
-            </select>
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {equalizationConfig.type === 'sum'
-                ? t('soccer.affinity.equalizationDescSum')
-                : equalizationConfig.type === 'none'
-                ? t('soccer.affinity.equalizationDescNone')
-                : t('soccer.affinity.equalizationDescMax')}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Contextual Affinity Matrix Header & View Mode Switcher */}
+      {/* 1. Contextual Affinity Matrix Header & View Mode Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
           <Network className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />

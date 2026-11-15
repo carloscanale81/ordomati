@@ -160,13 +160,11 @@ const SingleSeaterCarLineArt: React.FC<LineArtProps> = ({
 );
 
 const ILLUSTRATION_COMPONENTS: Record<FlavourWatermarkVariant, React.FC<LineArtProps>> = {
-  'soccer-ball': SoccerBallLineArt,
-  'race-car': SingleSeaterCarLineArt
+  'soccer-ball': SoccerBallLineArt
 };
 
 const DEFAULT_WATERMARK_STROKE: Record<FlavourWatermarkVariant, number> = {
-  'soccer-ball': 2.5,
-  'race-car': 2.3
+  'soccer-ball': 2.5
 };
 
 /**

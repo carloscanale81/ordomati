@@ -4,6 +4,7 @@ export * from './components/Formula';
 export * from './components/MatrixEditor';
 export * from './components/ValueFlowGraph';
 export * from './components/PhaseStepper';
+export * from './components/MicroTargetChart';
 export * from './components/LanguageSelector';
 export * from './phases/ConfigPhase';
 export * from './phases/CharacteristicPhase';

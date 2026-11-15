@@ -96,28 +96,10 @@ export const SoccerDimensionGraph: React.FC<SoccerDimensionGraphProps> = ({
   // Sort ascending by value so stronger edges are drawn on top
   allEdges.sort((a, b) => a.val - b.val);
 
-  const activeNodeInfo = hoveredNode !== null ? nodes[hoveredNode] : null;
-
   return (
     <div
       className={`w-full rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-xs relative bg-slate-900 select-none ${className}`}
     >
-      {/* Top Banner Indicator on Node Hover */}
-      <div className="absolute top-3 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
-        {activeNodeInfo ? (
-          <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-950/90 border border-indigo-500/50 text-indigo-200 text-xs shadow-md animate-in fade-in duration-150">
-            <span className="font-mono font-bold text-indigo-400">{activeNodeInfo.code}</span>
-            <span>·</span>
-            <span className="font-semibold">{activeNodeInfo.name}</span>
-            <span className="text-[11px] text-indigo-300/80">({activeNodeInfo.concept.unit})</span>
-          </div>
-        ) : (
-          <div className="text-[11px] text-slate-400 font-medium px-2 py-0.5">
-            Pasa el cursor sobre una dimensión para resaltar sus relaciones
-          </div>
-        )}
-      </div>
-
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto drop-shadow-md">
         <defs>
           {/* Arrowhead marker */}
@@ -173,7 +155,7 @@ export const SoccerDimensionGraph: React.FC<SoccerDimensionGraphProps> = ({
           const controlX = edge.fromNode.x + dx / 2 + nx * curveOffset;
           const controlY = edge.fromNode.y + dy / 2 + ny * curveOffset;
 
-          const nodeMargin = 26;
+          const nodeMargin = 20;
           const startDx = controlX - edge.fromNode.x;
           const startDy = controlY - edge.fromNode.y;
           const startLen = Math.sqrt(startDx * startDx + startDy * startDy);
@@ -189,15 +171,16 @@ export const SoccerDimensionGraph: React.FC<SoccerDimensionGraphProps> = ({
           const midX = 0.25 * startX + 0.5 * controlX + 0.25 * endX;
           const midY = 0.25 * startY + 0.5 * controlY + 0.25 * endY;
 
-          const strokeWidth = Math.max(0.75, (edge.val / maxVal) * 3.8);
+          // Stroke width proportional to edge weight (matching pitch graph)
+          const strokeWidth = Math.max(0.65, (edge.val / maxVal) * 3.6);
           const baseOpacity = isFaded
-            ? 0.05
+            ? 0.08
             : isNodeHovered
             ? 0.95
-            : Math.max(0.18, 0.12 + (edge.val / maxVal) * 0.65);
+            : Math.max(0.2, 0.15 + (edge.val / maxVal) * 0.65);
 
           const strokeColor = isNodeHovered
-            ? '#a5b4fc'
+            ? '#c7d2fe'
             : edge.ratio >= 0.7
             ? '#818cf8'
             : '#6366f1';
@@ -208,11 +191,11 @@ export const SoccerDimensionGraph: React.FC<SoccerDimensionGraphProps> = ({
                 d={`M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`}
                 fill="none"
                 stroke={strokeColor}
-                strokeWidth={isNodeHovered ? strokeWidth + 0.8 : strokeWidth}
+                strokeWidth={isNodeHovered ? strokeWidth + 0.6 : strokeWidth}
                 markerEnd={`url(#${markerId})`}
                 opacity={baseOpacity}
               >
-                <title>{`${edge.fromNode.code} (${edge.fromNode.name}) → ${edge.toNode.code} (${edge.toNode.name}): ${edge.val.toFixed(
+                <title>{`${edge.fromNode.abbr} (${edge.fromNode.name}) → ${edge.toNode.abbr} (${edge.toNode.name}): ${edge.val.toFixed(
                   decimalPrecision
                 )}`}</title>
               </path>
@@ -274,47 +257,34 @@ export const SoccerDimensionGraph: React.FC<SoccerDimensionGraphProps> = ({
               {/* Outer Pulse Rounded Ring on Hover */}
               {isHovered && (
                 <rect
-                  x="-32"
-                  y="-24"
-                  width="64"
-                  height="48"
-                  rx="12"
+                  x="-24"
+                  y="-21"
+                  width="48"
+                  height="42"
+                  rx="10"
                   fill="none"
-                  stroke="#a5b4fc"
-                  strokeWidth="2"
-                  opacity="0.8"
+                  stroke="#ffffff"
+                  strokeWidth="1.5"
+                  opacity="0.6"
                 />
               )}
 
-              {/* Square Node with Rounded Corners */}
+              {/* Square / Rounded Rectangle Node */}
               <rect
-                x="-26"
-                y="-18"
-                width="52"
-                height="36"
-                rx="8"
+                x="-18"
+                y="-15"
+                width="36"
+                height="30"
+                rx="7"
                 fill={isHovered ? '#312e81' : '#1e1b4b'}
                 stroke={isHovered ? '#c7d2fe' : '#818cf8'}
-                strokeWidth={isHovered ? 2.5 : 1.6}
+                strokeWidth={isHovered ? 2.5 : 1.8}
               />
 
-              {/* Dimension Code Badge (e.g. D1, D2) */}
+              {/* Dimension Abbreviated Name inside the node (no D#) */}
               <text
                 x="0"
-                y="-5"
-                textAnchor="middle"
-                fontSize="9"
-                fontWeight="bold"
-                fill="#a5b4fc"
-                className="font-mono select-none"
-              >
-                {node.code}
-              </text>
-
-              {/* Dimension Short Abbreviation (matching table headers: Reg, Gol, Aér...) */}
-              <text
-                x="0"
-                y="9"
+                y="4.5"
                 textAnchor="middle"
                 fontSize="11"
                 fontWeight="900"
@@ -324,8 +294,8 @@ export const SoccerDimensionGraph: React.FC<SoccerDimensionGraphProps> = ({
                 {node.abbr}
               </text>
 
-              {/* Title tag for native browser tooltip fallback */}
-              <title>{`${node.code}: ${node.name} (${node.concept.unit})`}</title>
+              {/* Tooltip on hover with complete name and unit (no D#) */}
+              <title>{`${node.name} (${node.concept.unit})`}</title>
             </g>
           );
         })}

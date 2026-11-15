@@ -15,6 +15,7 @@ import {
   Link2,
   Loader2,
   MapPin,
+  Network,
   Play,
   RotateCw,
   Sliders,
@@ -61,6 +62,8 @@ import { Card } from './Card';
 import { FlavourWatermark } from './FlavourWatermark';
 import { SoccerTimelineSlider } from './SoccerTimelineSlider';
 import { SoccerGeneralConfigPanel } from './SoccerGeneralConfigPanel';
+import { PipelineFunctionKey } from './SoccerPipelineFunctionsConfig';
+import { SoccerContextualAffinityPanel } from './SoccerContextualAffinityPanel';
 import { SoccerDimensionCard } from './SoccerDimensionCard';
 import { SoccerAggregateCard } from './SoccerAggregateCard';
 import { SoccerIntegralMatchAnalysis } from './SoccerIntegralMatchAnalysis';
@@ -85,11 +88,6 @@ const FLAVOUR_TEXT_KEYS: Record<
     titleKey: 'header.menu.matchSoccerMvp',
     descKey: 'header.menu.matchSoccerMvpDesc',
     placeholderKey: 'flavours.analysisControls.urlPlaceholder.matchSoccerMvp'
-  },
-  'race-driver': {
-    titleKey: 'header.menu.raceDriver',
-    descKey: 'header.menu.raceDriverDesc',
-    placeholderKey: 'flavours.analysisControls.urlPlaceholder.raceDriver'
   }
 };
 
@@ -121,12 +119,68 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>('');
   const [isConfigCollapsed, setIsConfigCollapsed] = useState<boolean>(false);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(false);
+  const [isAffinityCollapsed, setIsAffinityCollapsed] = useState<boolean>(false);
   const [soccerAnalysisCalculated, setSoccerAnalysisCalculated] = useState<boolean>(true);
+
+  // Global Pipeline Functions Config
   const [soccerPropagationConfig, setSoccerPropagationConfig] = useState<SoccerPropagationConfig>({
     type: 'maxRatio'
   });
   const [soccerBlockingConfig, setSoccerBlockingConfig] = useState<SoccerBlockingConfig>({
     type: 'none'
+  });
+  const [soccerSynergyConfig, setSoccerSynergyConfig] = useState<SynergyConfig>({
+    type: 'none',
+    k: 1.0
+  });
+  const [soccerRelativeConfig, setSoccerRelativeConfig] = useState<SoccerRelativeAdjustmentConfig>({
+    type: 'none'
+  });
+  const [soccerEqualizationConfig, setSoccerEqualizationConfig] = useState<SoccerEqualizationConfig>({
+    type: 'max'
+  });
+
+  // Per-Dimension Override Flags
+  const [dimensionOverrides, setDimensionOverrides] = useState<
+    Record<SoccerConcept, Record<PipelineFunctionKey, boolean>>
+  >(() => {
+    const init: any = {};
+    SOCCER_CONCEPTS.forEach(c => {
+      init[c.key] = {
+        propagation: false,
+        blocking: false,
+        synergy: false,
+        relative: false,
+        equalization: false
+      };
+    });
+    return init;
+  });
+
+  const handleToggleDimensionOverride = (
+    concept: SoccerConcept,
+    fnKey: PipelineFunctionKey,
+    enabled: boolean
+  ) => {
+    setDimensionOverrides(prev => ({
+      ...prev,
+      [concept]: {
+        ...prev[concept],
+        [fnKey]: enabled
+      }
+    }));
+  };
+
+  // Per-Dimension Pipeline Functions Configs (used when overridden in a dimension)
+  const [soccerPropagationConfigs, setSoccerPropagationConfigs] = useState<Record<SoccerConcept, SoccerPropagationConfig>>(() => {
+    const init: any = {};
+    SOCCER_CONCEPTS.forEach(c => { init[c.key] = { type: 'maxRatio' }; });
+    return init;
+  });
+  const [soccerBlockingConfigs, setSoccerBlockingConfigs] = useState<Record<SoccerConcept, SoccerBlockingConfig>>(() => {
+    const init: any = {};
+    SOCCER_CONCEPTS.forEach(c => { init[c.key] = { type: 'none' }; });
+    return init;
   });
   const [soccerSynergyConfigs, setSoccerSynergyConfigs] = useState<Record<SoccerConcept, SynergyConfig>>({
     dribblesWon: { type: 'none', k: 1.0 },
@@ -144,12 +198,79 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     dribbles: { type: 'none', k: 1.0 },
     shots: { type: 'none', k: 1.0 }
   });
-  const [soccerRelativeConfig, setSoccerRelativeConfig] = useState<SoccerRelativeAdjustmentConfig>({
-    type: 'none'
+  const [soccerRelativeConfigs, setSoccerRelativeConfigs] = useState<Record<SoccerConcept, SoccerRelativeAdjustmentConfig>>(() => {
+    const init: any = {};
+    SOCCER_CONCEPTS.forEach(c => { init[c.key] = { type: 'none' }; });
+    return init;
   });
-  const [soccerEqualizationConfig, setSoccerEqualizationConfig] = useState<SoccerEqualizationConfig>({
-    type: 'max'
+  const [soccerEqualizationConfigs, setSoccerEqualizationConfigs] = useState<Record<SoccerConcept, SoccerEqualizationConfig>>(() => {
+    const init: any = {};
+    SOCCER_CONCEPTS.forEach(c => { init[c.key] = { type: 'max' }; });
+    return init;
   });
+
+  // Check if a function is overridden in all 12 dimensions
+  const isAllPropagationOverridden = useMemo(
+    () => SOCCER_CONCEPTS.every(c => dimensionOverrides[c.key]?.propagation),
+    [dimensionOverrides]
+  );
+  const isAllBlockingOverridden = useMemo(
+    () => SOCCER_CONCEPTS.every(c => dimensionOverrides[c.key]?.blocking),
+    [dimensionOverrides]
+  );
+  const isAllSynergyOverridden = useMemo(
+    () => SOCCER_CONCEPTS.every(c => dimensionOverrides[c.key]?.synergy),
+    [dimensionOverrides]
+  );
+  const isAllRelativeOverridden = useMemo(
+    () => SOCCER_CONCEPTS.every(c => dimensionOverrides[c.key]?.relative),
+    [dimensionOverrides]
+  );
+  const isAllEqualizationOverridden = useMemo(
+    () => SOCCER_CONCEPTS.every(c => dimensionOverrides[c.key]?.equalization),
+    [dimensionOverrides]
+  );
+
+  const disabledGeneralKeys = useMemo(
+    () => ({
+      propagation: isAllPropagationOverridden,
+      blocking: isAllBlockingOverridden,
+      synergy: isAllSynergyOverridden,
+      relative: isAllRelativeOverridden,
+      equalization: isAllEqualizationOverridden
+    }),
+    [
+      isAllPropagationOverridden,
+      isAllBlockingOverridden,
+      isAllSynergyOverridden,
+      isAllRelativeOverridden,
+      isAllEqualizationOverridden
+    ]
+  );
+
+  const disabledGeneralNotes = useMemo(
+    () => ({
+      propagation: isAllPropagationOverridden ? 'Sobrescrita en todas las dimensiones' : undefined,
+      blocking: isAllBlockingOverridden ? 'Sobrescrita en todas las dimensiones' : undefined,
+      synergy: isAllSynergyOverridden ? 'Sobrescrita en todas las dimensiones' : undefined,
+      relative: isAllRelativeOverridden ? 'Sobrescrita en todas las dimensiones' : undefined,
+      equalization: isAllEqualizationOverridden ? 'Sobrescrita en todas las dimensiones' : undefined
+    }),
+    [
+      isAllPropagationOverridden,
+      isAllBlockingOverridden,
+      isAllSynergyOverridden,
+      isAllRelativeOverridden,
+      isAllEqualizationOverridden
+    ]
+  );
+
+  // If propagation, blocking, or synergy is overridden in all dimensions, hide the generic contextual affinity card
+  const hasSpecificAffinityInAllDims = useMemo(
+    () => isAllPropagationOverridden || isAllBlockingOverridden || isAllSynergyOverridden,
+    [isAllPropagationOverridden, isAllBlockingOverridden, isAllSynergyOverridden]
+  );
+
   const [soccerOwaConfig, setSoccerOwaConfig] = useState<SoccerOwaConfig>({
     type: 'average',
     weights: [...SOCCER_OWA_PRESETS.average]
@@ -265,22 +386,36 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     return soccerTimeline.homeSegments[0] || soccerTimeline.awaySegments[0] || null;
   }, [soccerTimeline, selectedSegmentId]);
 
-  // Compute dimensional analyses for all 4 concepts (Regates, Goles, Aéreos ganados, Tiros) for the active segment
+  // Compute dimensional analyses for all concepts for the active segment
   const soccerDimAnalyses: SoccerDimensionalAnalysis[] = useMemo(() => {
     if (!parsedSoccerMatchData || !activeSegment) return [];
     try {
-      return SOCCER_CONCEPTS.map(cfg =>
-        computeSoccerDimensionalAnalysis(
+      return SOCCER_CONCEPTS.map(cfg => {
+        const overrides = dimensionOverrides[cfg.key];
+        const propCfg = overrides?.propagation
+          ? (soccerPropagationConfigs[cfg.key] || { type: 'maxRatio' })
+          : soccerPropagationConfig;
+        const blockCfg = overrides?.blocking
+          ? (soccerBlockingConfigs[cfg.key] || { type: 'none' })
+          : soccerBlockingConfig;
+        const synCfg = overrides?.synergy
+          ? (soccerSynergyConfigs[cfg.key] || { type: 'none', k: 1.0 })
+          : soccerSynergyConfig;
+        const relCfg = overrides?.relative
+          ? (soccerRelativeConfigs[cfg.key] || { type: 'none' })
+          : soccerRelativeConfig;
+
+        return computeSoccerDimensionalAnalysis(
           parsedSoccerMatchData,
           activeSegment,
           soccerAnalysisCalculated,
-          soccerSynergyConfigs[cfg.key] || { type: 'none', k: 1.0 },
+          synCfg,
           cfg.key,
-          soccerPropagationConfig,
-          soccerBlockingConfig,
-          soccerRelativeConfig
-        )
-      );
+          propCfg,
+          blockCfg,
+          relCfg
+        );
+      });
     } catch (err) {
       console.warn('Failed to compute soccer dimensional analyses', err);
       return [];
@@ -289,28 +424,47 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     parsedSoccerMatchData,
     activeSegment,
     soccerAnalysisCalculated,
-    soccerSynergyConfigs,
+    dimensionOverrides,
     soccerPropagationConfig,
+    soccerPropagationConfigs,
     soccerBlockingConfig,
-    soccerRelativeConfig
+    soccerBlockingConfigs,
+    soccerSynergyConfig,
+    soccerSynergyConfigs,
+    soccerRelativeConfig,
+    soccerRelativeConfigs
   ]);
 
   // Compute multi-dimensional aggregated analysis for the active segment
   const soccerAggAnalysis = useMemo(() => {
     if (!activeSegment || soccerDimAnalyses.length === 0) return null;
     try {
+      const eqCfg = SOCCER_CONCEPTS.map(c =>
+        dimensionOverrides[c.key]?.equalization
+          ? (soccerEqualizationConfigs[c.key] || { type: 'max' })
+          : soccerEqualizationConfig
+      );
+
       return computeSoccerAggregatedAnalysis(
         soccerDimAnalyses,
         activeSegment,
         soccerOwaConfig,
         soccerDimAffinity,
-        soccerEqualizationConfig
+        eqCfg
       );
     } catch (err) {
       console.warn('Failed to compute soccer aggregated analysis', err);
       return null;
     }
-  }, [activeSegment, soccerDimAnalyses, soccerOwaConfig, soccerDimAffinity, soccerEqualizationConfig]);
+  }, [
+    activeSegment,
+    soccerDimAnalyses,
+    soccerOwaConfig,
+    soccerDimAffinity,
+    dimensionOverrides,
+    soccerEqualizationConfig,
+    soccerEqualizationConfigs
+  ]);
 
   const definition = FLAVOUR_DEFINITIONS[flavourCase.flavour];
   const textKeys = FLAVOUR_TEXT_KEYS[flavourCase.flavour];
@@ -927,48 +1081,6 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
             )}
           </Card>
 
-          {/* Soccer Flavour Empty State (when no match JSON loaded yet) */}
-          {isSoccerFlavour && !parsedSoccerMatchData && (
-            <Card
-              title={
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                  <span className="font-bold text-gray-900 dark:text-gray-100">
-                    {t('soccer.emptyState.title')}
-                  </span>
-                </div>
-              }
-              className="bg-white/95 dark:bg-gray-900/95 shadow-sm text-center py-8"
-            >
-              <div className="max-w-md mx-auto space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center">
-                  <SlidersHorizontal className="w-6 h-6" />
-                </div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">
-                  {t('soccer.emptyState.heading')}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                  {t('soccer.emptyState.description')}
-                </p>
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={handleLoadUrl}
-                    disabled={isScraping}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors cursor-pointer"
-                  >
-                    {isScraping ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Play className="w-4 h-4" />
-                    )}
-                    <span>{t('flavours.analysisControls.load')}</span>
-                  </button>
-                </div>
-              </div>
-            </Card>
-          )}
-
           {/* Soccer Flavour Analysis Container (rendered once match data is loaded) */}
           {isSoccerFlavour && parsedSoccerMatchData && (
             <div className="space-y-4">
@@ -998,34 +1110,22 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                 >
                   {!isConfigCollapsed && (
                     <SoccerGeneralConfigPanel
-                      segment={activeSegment}
-                      players={activeSegment.activePlayers}
-                      AC={soccerDimAnalyses[0].AC}
-                      passCounts={soccerDimAnalyses[0].passCounts}
-                      teamKey={activeSegment.team}
                       propagationConfig={soccerPropagationConfig}
                       onUpdatePropagation={setSoccerPropagationConfig}
                       blockingConfig={soccerBlockingConfig}
                       onUpdateBlocking={setSoccerBlockingConfig}
-                      synergyConfig={soccerSynergyConfigs['dribblesWon'] || { type: 'none', k: 1.0 }}
-                      onUpdateSynergy={nextCfg => {
-                        setSoccerSynergyConfigs(prev => {
-                          const updated = { ...prev };
-                          SOCCER_CONCEPTS.forEach(c => {
-                            updated[c.key] = nextCfg;
-                          });
-                          return updated;
-                        });
-                      }}
+                      synergyConfig={soccerSynergyConfig}
+                      onUpdateSynergy={setSoccerSynergyConfig}
                       relativeConfig={soccerRelativeConfig}
                       onUpdateRelativeAdjustment={setSoccerRelativeConfig}
                       equalizationConfig={soccerEqualizationConfig}
                       onUpdateEqualization={setSoccerEqualizationConfig}
+                      disabledKeys={disabledGeneralKeys}
+                      disabledNotes={disabledGeneralNotes}
                       owaConfig={soccerOwaConfig}
                       onUpdateOwa={setSoccerOwaConfig}
                       dimAffinityMatrix={soccerDimAffinity}
                       onUpdateDimAffinity={setSoccerDimAffinity}
-                      crestUrl={activeSegment.team === 'home' ? soccerTimeline?.homeCrestUrl : soccerTimeline?.awayCrestUrl}
                     />
                   )}
                 </Card>
@@ -1125,6 +1225,43 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                     </Card>
                   )}
 
+                  {/* Tarjeta Separada: Afinidad Contextual (Debajo de Segmentación Temporal, oculta si todas las dimensiones sobreescriben afinidad) */}
+                  {!hasSpecificAffinityInAllDims && activeSegment && soccerDimAnalyses.length > 0 && (
+                    <Card
+                      title={
+                        <div className="flex items-center gap-2">
+                          <Network className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          <span className="font-bold text-gray-900 dark:text-gray-100">
+                            {t('soccer.affinity.contextualTitle') || 'Afinidad Contextual'}
+                          </span>
+                        </div>
+                      }
+                      action={
+                        <button
+                          type="button"
+                          onClick={() => setIsAffinityCollapsed(prev => !prev)}
+                          title={isAffinityCollapsed ? t('soccer.dimension.expand') : t('soccer.dimension.collapse')}
+                          aria-label={isAffinityCollapsed ? t('soccer.dimension.expand') : t('soccer.dimension.collapse')}
+                          className="w-8 h-8 rounded-full flex items-center justify-center transition-all bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 shadow-2xs cursor-pointer select-none"
+                        >
+                          {isAffinityCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                        </button>
+                      }
+                      className="bg-white/95 dark:bg-gray-900/95 shadow-sm"
+                    >
+                      {!isAffinityCollapsed && (
+                        <SoccerContextualAffinityPanel
+                          segment={activeSegment}
+                          players={activeSegment.activePlayers}
+                          AC={soccerDimAnalyses[0].AC}
+                          passCounts={soccerDimAnalyses[0].passCounts}
+                          teamKey={activeSegment.team}
+                          crestUrl={activeSegment.team === 'home' ? soccerTimeline?.homeCrestUrl : soccerTimeline?.awayCrestUrl}
+                        />
+                      )}
+                    </Card>
+                  )}
+
                   {/* 12 Dimension Cards */}
                   {soccerDimAnalyses.map(analysis => (
                     <SoccerDimensionCard
@@ -1132,6 +1269,32 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                       concept={analysis.concept}
                       conceptTitle={analysis.conceptName}
                       analysis={analysis}
+                      segment={activeSegment || undefined}
+                      crestUrl={activeSegment?.team === 'home' ? soccerTimeline?.homeCrestUrl : soccerTimeline?.awayCrestUrl}
+                      overrideFlags={dimensionOverrides[analysis.concept]}
+                      onToggleOverride={(fnKey, enabled) =>
+                        handleToggleDimensionOverride(analysis.concept, fnKey, enabled)
+                      }
+                      propagationConfig={soccerPropagationConfigs[analysis.concept] || { type: 'maxRatio' }}
+                      onUpdatePropagation={next => {
+                        setSoccerPropagationConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                      }}
+                      blockingConfig={soccerBlockingConfigs[analysis.concept] || { type: 'none' }}
+                      onUpdateBlocking={next => {
+                        setSoccerBlockingConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                      }}
+                      synergyConfig={soccerSynergyConfigs[analysis.concept] || { type: 'none', k: 1.0 }}
+                      onUpdateSynergy={next => {
+                        setSoccerSynergyConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                      }}
+                      relativeConfig={soccerRelativeConfigs[analysis.concept] || { type: 'none' }}
+                      onUpdateRelativeAdjustment={next => {
+                        setSoccerRelativeConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                      }}
+                      equalizationConfig={soccerEqualizationConfigs[analysis.concept] || { type: 'max' }}
+                      onUpdateEqualization={next => {
+                        setSoccerEqualizationConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                      }}
                       onRecalculate={handleExecute}
                     />
                   ))}

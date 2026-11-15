@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Sliders, Grid, Table, Network } from 'lucide-react';
 import {
-  MatchPlayer,
-  TimelineSegment,
   SoccerPropagationConfig,
   SoccerBlockingConfig,
   SoccerRelativeAdjustmentConfig,
@@ -14,15 +12,14 @@ import {
 } from '../../logic/soccerAnalysis';
 import { SynergyConfig } from '../../logic/types';
 import { useI18n } from '../i18n/I18nContext';
-import { SoccerContextualAffinityPanel } from './SoccerContextualAffinityPanel';
+import { DecimalInput } from './DecimalInput';
+import {
+  SoccerPipelineFunctionsConfig,
+  PipelineFunctionKey
+} from './SoccerPipelineFunctionsConfig';
 import { SoccerDimensionGraph } from './SoccerDimensionGraph';
 
 export interface SoccerGeneralConfigPanelProps {
-  segment: TimelineSegment;
-  players: MatchPlayer[];
-  AC: number[][];
-  passCounts?: number[][];
-  teamKey?: 'home' | 'away';
   propagationConfig: SoccerPropagationConfig;
   onUpdatePropagation: (next: SoccerPropagationConfig) => void;
   blockingConfig: SoccerBlockingConfig;
@@ -33,20 +30,16 @@ export interface SoccerGeneralConfigPanelProps {
   onUpdateRelativeAdjustment: (next: SoccerRelativeAdjustmentConfig) => void;
   equalizationConfig: SoccerEqualizationConfig;
   onUpdateEqualization: (next: SoccerEqualizationConfig) => void;
+  disabledKeys?: Partial<Record<PipelineFunctionKey, boolean>>;
+  disabledNotes?: Partial<Record<PipelineFunctionKey, string>>;
   owaConfig: SoccerOwaConfig;
   onUpdateOwa: (next: SoccerOwaConfig) => void;
   dimAffinityMatrix: number[][];
   onUpdateDimAffinity: (next: number[][]) => void;
-  crestUrl?: string;
   className?: string;
 }
 
 export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> = ({
-  segment,
-  players,
-  AC,
-  passCounts,
-  teamKey = 'home',
   propagationConfig,
   onUpdatePropagation,
   blockingConfig,
@@ -57,11 +50,12 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
   onUpdateRelativeAdjustment,
   equalizationConfig,
   onUpdateEqualization,
+  disabledKeys,
+  disabledNotes,
   owaConfig,
   onUpdateOwa,
   dimAffinityMatrix,
   onUpdateDimAffinity,
-  crestUrl,
   className = ''
 }) => {
   const { t } = useI18n();
@@ -74,42 +68,23 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
     });
   };
 
-  const handleOwaWeightChange = (index: number, valStr: string) => {
-    if (valStr.trim() === '') {
-      const nextWeights = [...owaConfig.weights];
-      nextWeights[index] = 0;
-      onUpdateOwa({ type: 'custom', weights: nextWeights });
-      return;
-    }
-    const val = parseFloat(valStr);
-    if (isNaN(val) || val < 0) return;
+  const handleOwaWeightChange = (index: number, val: number) => {
     const nextWeights = [...owaConfig.weights];
-    nextWeights[index] = val;
+    nextWeights[index] = Math.max(0, Math.min(1, val));
     onUpdateOwa({
       type: 'custom',
       weights: nextWeights
     });
   };
 
-  const handleDimCellChange = (r: number, c: number, valStr: string) => {
+  const handleDimCellChange = (r: number, c: number, val: number) => {
     if (r === c) return;
-    if (valStr.trim() === '') {
-      const next = dimAffinityMatrix.map((row, i) =>
-        row.map((cell, j) => {
-          if ((i === r && j === c) || (i === c && j === r)) return 0;
-          return cell;
-        })
-      );
-      onUpdateDimAffinity(next);
-      return;
-    }
-    const val = parseFloat(valStr);
-    if (isNaN(val) || val < 0 || val > 1) return;
+    const clamped = Math.max(0, Math.min(1, val));
     const next = dimAffinityMatrix.map((row, i) =>
       row.map((cell, j) => {
-        if (i === r && j === c) return val;
+        if (i === r && j === c) return clamped;
         // Keep symmetric by default for dimension correlation
-        if (i === c && j === r) return val;
+        if (i === c && j === r) return clamped;
         return cell;
       })
     );
@@ -118,25 +93,32 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* 1. Contextual Affinity & 5-Function Pipeline Panel */}
-      <SoccerContextualAffinityPanel
-        segment={segment}
-        players={players}
-        AC={AC}
-        passCounts={passCounts}
-        teamKey={teamKey}
-        propagationConfig={propagationConfig}
-        onUpdatePropagation={onUpdatePropagation}
-        blockingConfig={blockingConfig}
-        onUpdateBlocking={onUpdateBlocking}
-        synergyConfig={synergyConfig}
-        onUpdateSynergy={onUpdateSynergy}
-        relativeConfig={relativeConfig}
-        onUpdateRelativeAdjustment={onUpdateRelativeAdjustment}
-        equalizationConfig={equalizationConfig}
-        onUpdateEqualization={onUpdateEqualization}
-        crestUrl={crestUrl}
-      />
+      {/* 1. Funciones del Pipeline de Cálculo */}
+      <div className="p-4 rounded-xl bg-gray-50/80 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-800 space-y-3 w-full shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <Sliders className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+            <h3 className="text-xs font-bold text-gray-900 dark:text-gray-100">
+              {t('soccer.generalConfig.functionsTitle') || 'Funciones del Pipeline de Cálculo'}
+            </h3>
+          </div>
+        </div>
+
+        <SoccerPipelineFunctionsConfig
+          propagationConfig={propagationConfig}
+          onUpdatePropagation={onUpdatePropagation}
+          blockingConfig={blockingConfig}
+          onUpdateBlocking={onUpdateBlocking}
+          synergyConfig={synergyConfig}
+          onUpdateSynergy={onUpdateSynergy}
+          relativeConfig={relativeConfig}
+          onUpdateRelativeAdjustment={onUpdateRelativeAdjustment}
+          equalizationConfig={equalizationConfig}
+          onUpdateEqualization={onUpdateEqualization}
+          disabledKeys={disabledKeys}
+          disabledNotes={disabledNotes}
+        />
+      </div>
 
       {/* 2. Operador OWA (Ancho completo) */}
       <div className="p-4 rounded-xl bg-gray-50/80 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-800 space-y-3 w-full shadow-2xs">
@@ -185,13 +167,11 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
               >
                 w{idx + 1} (Pos. {idx + 1})
               </label>
-              <input
-                type="number"
-                step="0.001"
-                min="0"
-                max="1"
+              <DecimalInput
+                min={0}
+                max={1}
                 value={weight !== undefined ? Math.round(weight * 10000) / 10000 : 0.0833}
-                onChange={e => handleOwaWeightChange(idx, e.target.value)}
+                onChange={val => handleOwaWeightChange(idx, val)}
                 className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
@@ -250,11 +230,11 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
                   <th className="p-1.5 text-[10px] text-gray-500 font-sans text-left sticky left-0 bg-white dark:bg-gray-800 z-20">
                     Dim
                   </th>
-                  {SOCCER_CONCEPTS.map((c, cIdx) => (
+                  {SOCCER_CONCEPTS.map(c => (
                     <th
                       key={c.key}
                       className="p-1.5 text-[10px] text-gray-600 dark:text-gray-400 font-semibold"
-                      title={`D${cIdx + 1}: ${c.name}`}
+                      title={c.name}
                     >
                       {c.name.slice(0, 3)}
                     </th>
@@ -266,7 +246,7 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
                   <tr key={rowC.key} className="border-b border-gray-100 dark:border-gray-800">
                     <td
                       className="p-1.5 text-[10px] text-gray-600 dark:text-gray-400 font-sans font-semibold text-left sticky left-0 bg-white dark:bg-gray-800 z-10"
-                      title={`D${r + 1}: ${rowC.name}`}
+                      title={rowC.name}
                     >
                       {rowC.name.slice(0, 3)}
                     </td>
@@ -280,14 +260,12 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
                               1.00
                             </span>
                           ) : (
-                            <input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="1"
+                            <DecimalInput
+                              min={0}
+                              max={1}
                               value={val}
-                              onChange={e => handleDimCellChange(r, c, e.target.value)}
-                              className="w-10 py-0.5 text-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              onChange={newV => handleDimCellChange(r, c, newV)}
+                              className="w-10 py-0.5 text-center rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-[10px] focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
                             />
                           )}
                         </td>

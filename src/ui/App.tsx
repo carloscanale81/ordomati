@@ -1,7 +1,21 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Activity, Download, Upload, CheckCircle, X, ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import {
+  Activity,
+  Download,
+  Upload,
+  CheckCircle,
+  X,
+  ChevronDown,
+  ChevronUp,
+  PanelLeftClose,
+  PanelLeftOpen,
+  FileDown,
+  RotateCcw,
+  AlertTriangle
+} from 'lucide-react';
 import {
   createDefaultDataset,
+  createEmptyDataset,
   calculateOrdomatica,
   OrdomaticaDataset,
   AppMenuView,
@@ -12,11 +26,13 @@ import {
 } from '../logic';
 import { serializeFullCase, deserializeFullCase } from '../io/serializer';
 import { downloadJsonFile, readJsonFile } from '../io/browserIO';
+import { openOrdomaticsPdfReport } from '../io/ordomaticsPdfReport';
 import { PhaseStepper } from './components/PhaseStepper';
 import { LanguageSelector } from './components/LanguageSelector';
 import { ThemeToggle } from './components/ThemeToggle';
 import { MainNavMenu } from './components/MainNavMenu';
 import { FlavourPage } from './components/FlavourPage';
+import { FunctionSyntaxPage } from './components/FunctionSyntaxPage';
 import { AppFooter } from './components/AppFooter';
 import { ThemeProvider } from './theme/ThemeContext';
 import { ConfigPhase } from './phases/ConfigPhase';
@@ -26,7 +42,7 @@ import { I18nProvider, useI18n } from './i18n/I18nContext';
 
 function AppContent() {
   const { t, language } = useI18n();
-  const [dataset, setDataset] = useState<OrdomaticaDataset>(createDefaultDataset);
+  const [dataset, setDataset] = useState<OrdomaticaDataset>(createEmptyDataset);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -36,8 +52,7 @@ function AppContent() {
   const [activeCharIdx, setActiveCharIdx] = useState<number>(0);
   const [activeView, setActiveView] = useState<AppMenuView>('ordomachine');
   const [flavourCases, setFlavourCases] = useState<Record<FlavourId, FlavourAnalysisCase>>(() => ({
-    'match-soccer-mvp': createInitialFlavourState('match-soccer-mvp'),
-    'race-driver': createInitialFlavourState('race-driver')
+    'match-soccer-mvp': createInitialFlavourState('match-soccer-mvp')
   }));
   const [collapsedPhases, setCollapsedPhases] = useState<Record<number, boolean>>({});
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
@@ -59,6 +74,38 @@ function AppContent() {
 
   // Pure algorithmic calculation invoked reactively
   const calculation = useMemo(() => calculateOrdomatica(dataset), [dataset]);
+
+  // Check if calculation has executed completely with alternatives and dimensions
+  const isAnalysisComplete = useMemo(() => {
+    return Boolean(
+      dataset.elements.length > 0 &&
+      dataset.characteristics.length > 0 &&
+      calculation &&
+      calculation.chars.length > 0 &&
+      calculation.agg.A_final &&
+      calculation.agg.A_final.length > 0
+    );
+  }, [dataset.elements, dataset.characteristics, calculation]);
+
+  // Confirmation state for starting a new clean analysis
+  const [isNewAnalysisConfirmOpen, setIsNewAnalysisConfirmOpen] = useState(false);
+
+  const handleConfirmNewAnalysis = () => {
+    setDataset(createEmptyDataset());
+    setActiveCharIdx(0);
+    setActivePhase(0);
+    setIsNewAnalysisConfirmOpen(false);
+  };
+
+  // Handle Full Case PDF Report Generation
+  const handleGenerateReport = () => {
+    if (!isAnalysisComplete) return;
+    openOrdomaticsPdfReport({
+      dataset,
+      calculation,
+      language: language === 'en' ? 'en' : 'es'
+    });
+  };
 
   // Handle Full Case Export
   const handleExportCase = () => {
@@ -242,6 +289,50 @@ function AppContent() {
         </div>
       )}
 
+      {/* Confirmation Modal when New Analysis is clicked */}
+      {isNewAnalysisConfirmOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <h3 className="font-bold text-gray-800 dark:text-gray-100 text-base">
+                  {t('header.newAnalysisConfirmTitle')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewAnalysisConfirmOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+              {t('header.newAnalysisConfirmDesc')}
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsNewAnalysisConfirmOpen(false)}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+              >
+                {t('header.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmNewAnalysis}
+                className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                {t('header.newAnalysisConfirmBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* WORKSPACE: LEFT VERTICAL PHASE STEPPER + RIGHT SCROLLABLE PHASES */}
       {activeView === 'ordomachine' && (
         <div className="flex-1 flex overflow-hidden relative">
@@ -252,26 +343,60 @@ function AppContent() {
             }`}
           >
             <div>
-              {/* Case Actions (Export / Import) */}
-              <div className="grid grid-cols-2 gap-2 pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
-                <button
-                  type="button"
-                  onClick={handleExportCase}
-                  title={t('header.exportCase')}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/90 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer"
-                >
-                  <Download className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                  <span className="truncate">{t('header.exportCase')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  title={t('header.importCase')}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/90 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer"
-                >
-                  <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                  <span className="truncate">{t('header.importCase')}</span>
-                </button>
+              {/* Case Actions (Export / Import / Generate Report) */}
+              <div className="space-y-2 pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleExportCase}
+                    title={t('header.exportCase')}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/90 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <Download className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span className="truncate">{t('header.exportCase')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    title={t('header.importCase')}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/90 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span className="truncate">{t('header.importCase')}</span>
+                  </button>
+                </div>
+
+                {/* Actions Row: Nuevo Análisis (left) + Generar Informe (right, half-width) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsNewAnalysisConfirmOpen(true)}
+                    title={t('header.newAnalysis')}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-300 dark:hover:border-rose-800 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer select-none"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                    <span className="truncate">{t('header.newAnalysis')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateReport}
+                    disabled={!isAnalysisComplete}
+                    title={
+                      isAnalysisComplete
+                        ? t('header.generateReport')
+                        : t('header.generateReportDisabled')
+                    }
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border transition-all shadow-2xs select-none ${
+                      isAnalysisComplete
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 cursor-pointer shadow-blue-500/20'
+                        : 'bg-gray-100 dark:bg-gray-800/60 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-800 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <FileDown className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{t('header.generateReport')}</span>
+                  </button>
+                </div>
               </div>
 
               <PhaseStepper
@@ -283,6 +408,8 @@ function AppContent() {
                   setActiveCharIdx(idx);
                   scrollToPhase(1);
                 }}
+                processedChars={calculation?.chars}
+                elementsCount={dataset.elements.length}
               />
             </div>
           </aside>
@@ -381,6 +508,15 @@ function AppContent() {
           </div>
         </main>
         </div>
+      )}
+
+      {/* FUNCTION SYNTAX DOCUMENTATION VIEW (FULL WIDTH, SCROLLABLE, NO LEFT SIDEBAR) */}
+      {activeView === 'function-syntax' && (
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
+          <div className="max-w-7xl mx-auto space-y-8 pb-16">
+            <FunctionSyntaxPage />
+          </div>
+        </main>
       )}
 
       {/* FLAVOUR WORKSPACE VIEWS (FULL WIDTH, NO LEFT SIDEBAR) */}
