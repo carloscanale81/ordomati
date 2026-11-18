@@ -206,12 +206,12 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
   return (
     <div
       ref={containerRef}
-      className={`grid ${gridLayoutClass} gap-3 ${className}`}
+      className={`grid ${gridLayoutClass} gap-3 items-start ${className}`}
     >
       {/* Box 1: Función de Propagación F_P */}
       {isPropVisible && (
         <div
-          className={`flex flex-col justify-between ${
+          className={`flex flex-col justify-start ${
             compact ? 'p-2.5' : 'p-3'
           } rounded-xl bg-white dark:bg-gray-800/90 border border-purple-200 dark:border-purple-900/60 shadow-2xs relative ${
             isPropDisabled ? 'opacity-55' : ''
@@ -255,10 +255,10 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             {/* Trapezoidal parameters: L1 and L2 */}
             {propagationConfig.type === 'trapezoidal' && (
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5">
-                    {t('char.tower.limitL1')}
-                  </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 dark:text-gray-300 font-mono font-semibold shrink-0 whitespace-nowrap">
+                    L1 =
+                  </span>
                   <DecimalInput
                     disabled={isPropDisabled}
                     value={propagationConfig.l1 ?? 0}
@@ -266,10 +266,10 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
                     className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-center disabled:cursor-not-allowed"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5">
-                    {t('char.tower.limitL2')}
-                  </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 dark:text-gray-300 font-mono font-semibold shrink-0 whitespace-nowrap">
+                    L2 =
+                  </span>
                   <DecimalInput
                     disabled={isPropDisabled}
                     value={propagationConfig.limit ?? 10}
@@ -282,10 +282,10 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
 
             {/* Triangular, Rectangular, Sinusoidal parameters: limit L */}
             {['triangular', 'rectangular', 'sinusoidal'].includes(propagationConfig.type) && (
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5">
-                  {t('char.tower.limit')}
-                </label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-600 dark:text-gray-300 font-mono font-semibold shrink-0 whitespace-nowrap">
+                  L =
+                </span>
                 <DecimalInput
                   disabled={isPropDisabled}
                   value={propagationConfig.limit ?? 10}
@@ -298,7 +298,9 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             {/* MaxRatio: optional override limit L */}
             {propagationConfig.type === 'maxRatio' && (
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">L =</span>
+                <span className="text-xs text-gray-600 dark:text-gray-300 font-mono font-semibold shrink-0 whitespace-nowrap">
+                  L =
+                </span>
                 <DecimalInput
                   disabled={isPropDisabled}
                   placeholder="Máx."
@@ -320,22 +322,6 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:cursor-not-allowed"
               />
             )}
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {propagationConfig.type === 'triangular'
-                ? t('soccer.affinity.propagationDescTriangular')
-                : propagationConfig.type === 'rectangular'
-                ? t('soccer.affinity.propagationDescRectangular')
-                : propagationConfig.type === 'trapezoidal'
-                ? t('soccer.affinity.propagationDescTrapezoidal')
-                : propagationConfig.type === 'sinusoidal'
-                ? t('soccer.affinity.propagationDescSinusoidal')
-                : propagationConfig.type === 'inhibited'
-                ? t('soccer.affinity.propagationDescInhibited')
-                : propagationConfig.type === 'custom'
-                ? t('soccer.affinity.propagationDescCustom')
-                : t('soccer.affinity.propagationDescMaxRatio')}
-            </p>
           </div>
         </div>
       )}
@@ -343,7 +329,7 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
       {/* Box 2: Función de Bloqueo F_B */}
       {isBlockVisible && (
         <div
-          className={`flex flex-col justify-between ${
+          className={`flex flex-col justify-start ${
             compact ? 'p-2.5' : 'p-3'
           } rounded-xl bg-white dark:bg-gray-800/90 border border-amber-200 dark:border-amber-900/60 shadow-2xs relative ${
             isBlockDisabled ? 'opacity-55' : ''
@@ -384,7 +370,9 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             {/* Standard blocking: scalar vb factor */}
             {blockingConfig.type === 'standard' && (
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">vb =</span>
+                <span className="text-xs text-gray-600 dark:text-gray-300 font-mono font-semibold shrink-0 whitespace-nowrap">
+                  vb =
+                </span>
                 <DecimalInput
                   disabled={isBlockDisabled}
                   min={0}
@@ -399,7 +387,9 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             {/* Threshold blocking: theta threshold */}
             {blockingConfig.type === 'threshold' && (
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">θ =</span>
+                <span className="text-xs text-gray-600 dark:text-gray-300 font-mono font-semibold shrink-0 whitespace-nowrap">
+                  θ =
+                </span>
                 <DecimalInput
                   disabled={isBlockDisabled}
                   min={0}
@@ -422,16 +412,6 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:cursor-not-allowed"
               />
             )}
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {blockingConfig.type === 'standard'
-                ? t('soccer.affinity.blockingDescStandard')
-                : blockingConfig.type === 'threshold'
-                ? t('soccer.affinity.blockingDescThreshold')
-                : blockingConfig.type === 'custom'
-                ? t('soccer.affinity.blockingDescCustom')
-                : t('soccer.affinity.blockingDescNone')}
-            </p>
           </div>
         </div>
       )}
@@ -439,7 +419,7 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
       {/* Box 3: Función de Sinergia F_S */}
       {isSynVisible && (
         <div
-          className={`flex flex-col justify-between ${
+          className={`flex flex-col justify-start ${
             compact ? 'p-2.5' : 'p-3'
           } rounded-xl bg-white dark:bg-gray-800/90 border border-blue-200 dark:border-blue-900/60 shadow-2xs relative ${
             isSynDisabled ? 'opacity-55' : ''
@@ -479,7 +459,9 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             {/* Factor k input */}
             {synergyConfig?.type === 'factor' && (
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">k =</span>
+                <span className="text-xs text-gray-600 dark:text-gray-300 font-mono font-semibold shrink-0 whitespace-nowrap">
+                  k =
+                </span>
                 <DecimalInput
                   disabled={isSynDisabled}
                   min={0}
@@ -502,22 +484,13 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed"
               />
             )}
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {synergyConfig?.type === 'factor'
-                ? t('soccer.dimension.synergyDescFactor')
-                : synergyConfig?.type === 'custom'
-                ? t('soccer.dimension.synergyDescCustom')
-                : t('soccer.dimension.synergyDescNone')}
-            </p>
           </div>
         </div>
       )}
-
-      {/* Box 4: Ajuste Relativo c_a */}
+      {/* Box 4: Coeficiente de Ajuste Relativo c_a */}
       {isRelVisible && (
         <div
-          className={`flex flex-col justify-between ${
+          className={`flex flex-col justify-start ${
             compact ? 'p-2.5' : 'p-3'
           } rounded-xl bg-white dark:bg-gray-800/90 border border-indigo-200 dark:border-indigo-900/60 shadow-2xs relative ${
             isRelDisabled ? 'opacity-55' : ''
@@ -553,6 +526,7 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
 
             <FormulaCodeDisplay
               code={getRelativeFormula(relativeConfig)}
+              label={t('soccer.affinity.relativeAppliedFormula')}
               compact
             />
 
@@ -567,18 +541,6 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed"
               />
             )}
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {relativeConfig.type === 'byMinutes'
-                ? t('soccer.affinity.relativeDescMinutes')
-                : relativeConfig.type === 'byTouches'
-                ? t('soccer.affinity.relativeDescTouches')
-                : relativeConfig.type === 'byMean'
-                ? t('soccer.affinity.relativeDescMean')
-                : relativeConfig.type === 'custom'
-                ? t('soccer.affinity.relativeDescCustom')
-                : t('soccer.affinity.relativeDescNone')}
-            </p>
           </div>
         </div>
       )}
@@ -586,7 +548,7 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
       {/* Box 5: Ajuste por Equiparación c_n */}
       {isEqVisible && (
         <div
-          className={`flex flex-col justify-between ${
+          className={`flex flex-col justify-start ${
             compact ? 'p-2.5' : 'p-3'
           } rounded-xl bg-white dark:bg-gray-800/90 border border-emerald-200 dark:border-emerald-900/60 shadow-2xs relative ${
             isEqDisabled ? 'opacity-55' : ''
@@ -627,7 +589,9 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             {/* Target equalization: obj parameter */}
             {equalizationConfig.type === 'target' && (
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">obj =</span>
+                <span className="text-xs text-gray-600 dark:text-gray-300 font-mono font-semibold shrink-0 whitespace-nowrap">
+                  obj =
+                </span>
                 <DecimalInput
                   disabled={isEqDisabled}
                   min={0.01}
@@ -649,16 +613,6 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed"
               />
             )}
-
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {equalizationConfig.type === 'target'
-                ? t('soccer.affinity.equalizationDescTarget')
-                : equalizationConfig.type === 'none'
-                ? t('soccer.affinity.equalizationDescNone')
-                : equalizationConfig.type === 'custom'
-                ? t('soccer.affinity.equalizationDescCustom')
-                : t('soccer.affinity.equalizationDescMax')}
-            </p>
           </div>
         </div>
       )}

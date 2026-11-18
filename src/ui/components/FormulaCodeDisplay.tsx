@@ -37,7 +37,7 @@ export const FormulaCodeDisplay: React.FC<FormulaCodeDisplayProps> = ({
     >
       <div className="flex items-center gap-1.5 shrink-0 text-indigo-500 dark:text-indigo-400">
         <Code className="w-3.5 h-3.5" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider select-none text-indigo-600/80 dark:text-indigo-400/80">
+        <span className="text-[10px] font-semibold uppercase tracking-wider select-none text-indigo-600/80 dark:text-indigo-400/80 whitespace-nowrap">
           {label || t('char.tower.formulaCode')}:
         </span>
       </div>
