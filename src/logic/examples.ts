@@ -9,10 +9,34 @@ export interface CaseExample {
   id: string;
   fileName: string;
   displayName: string;
+  description?: string;
   category: 'ordomachine' | 'flavour';
   flavourId?: FlavourId;
   data: any;
 }
+
+/**
+ * Extracts a human-readable description from an exported JSON case or dataset.
+ */
+export const extractExampleDescription = (data: any): string => {
+  if (!data) return '';
+  if (typeof data.description === 'string' && data.description.trim()) {
+    return data.description.trim();
+  }
+  if (typeof data.dataset?.description === 'string' && data.dataset.description.trim()) {
+    return data.dataset.description.trim();
+  }
+  if (typeof data.dataset?.name === 'string' && data.dataset.name.trim()) {
+    return data.dataset.name.trim();
+  }
+  if (typeof data.name === 'string' && data.name.trim()) {
+    return data.name.trim();
+  }
+  if (typeof data.title === 'string' && data.title.trim()) {
+    return data.title.trim();
+  }
+  return '';
+};
 
 const mapFolderToFlavourId = (folder: string, data?: any): FlavourId | null => {
   const norm = folder.toLowerCase().replace(/_/g, '-');
@@ -41,10 +65,12 @@ export const getCaseExamples = (): CaseExample[] => {
         const fileName = parts[0];
         if (!fileName || fileName.startsWith('.')) continue;
         const data = mod?.default || mod;
+        const description = extractExampleDescription(data);
         map.set(fileName, {
           id: path,
           fileName,
           displayName: fileName,
+          description,
           category: 'ordomachine',
           data
         });
@@ -76,10 +102,12 @@ export const getFlavourExamples = (targetFlavourId: FlavourId): CaseExample[] =>
         const data = mod?.default || mod;
         const flavourId = mapFolderToFlavourId(folder, data);
         if (flavourId === targetFlavourId) {
+          const description = extractExampleDescription(data);
           map.set(fileName, {
             id: path,
             fileName,
             displayName: fileName,
+            description,
             category: 'flavour',
             flavourId,
             data
@@ -113,10 +141,12 @@ export const getAllFlavourExamples = (): Record<string, CaseExample[]> => {
         const flavourId = mapFolderToFlavourId(folder, data);
         if (flavourId) {
           if (!result[flavourId]) result[flavourId] = [];
+          const description = extractExampleDescription(data);
           result[flavourId].push({
             id: path,
             fileName,
             displayName: fileName,
+            description,
             category: 'flavour',
             flavourId,
             data
