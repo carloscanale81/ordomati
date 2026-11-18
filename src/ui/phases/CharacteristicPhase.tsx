@@ -3,7 +3,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowRight,
-  ArrowDown,
   Plus,
   Trash2,
   SlidersHorizontal,
@@ -17,8 +16,6 @@ import {
   Power,
   Target,
   Layers,
-  Lock,
-  Unlock,
   AlertTriangle,
   Search
 } from 'lucide-react';
@@ -36,36 +33,76 @@ import { MatrixCellCalculationPlayer } from '../components/MatrixCellCalculation
 import { MathText } from '../components/Formula';
 import { MicroTargetChart } from '../components/MicroTargetChart';
 import { DecimalInput } from '../components/DecimalInput';
+import { FormulaCodeDisplay } from '../components/FormulaCodeDisplay';
 import { invertMatrix, invertMatrixDetailed, createDefaultSampleMatrices } from '../../logic/affinity';
 import { OrdomaticaDataset, ProcessedCharacteristic, Characteristic, AffinityEntryStage } from '../../logic/types';
 import { useI18n } from '../i18n/I18nContext';
 
 
-interface FlowConnectorProps {
+interface TowerStageTransitionProps {
+  badgeLabel: React.ReactNode;
   disabled?: boolean;
-  label?: React.ReactNode;
+  children: React.ReactNode;
 }
 
-const FlowConnector: React.FC<FlowConnectorProps> = ({ disabled, label }) => (
-  <div className="flex flex-col items-center justify-center my-1 select-none py-1">
-    <div className={`w-0.5 h-3.5 transition-colors ${disabled ? 'bg-gray-200 dark:bg-gray-800' : 'bg-indigo-300 dark:bg-indigo-600'}`} />
-    <div
-      className={`px-3 py-1 rounded-full flex items-center gap-1.5 text-[11px] font-semibold transition-all border shadow-2xs ${
-        disabled
-          ? 'bg-gray-100 dark:bg-gray-850 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700'
-          : 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-      }`}
-    >
-      <ArrowDown className="w-3.5 h-3.5" />
-      {label && (
-        <span className="font-mono text-[10.5px] font-medium">
-          {typeof label === 'string' ? <MathText text={label} /> : label}
-        </span>
-      )}
+const TowerStageTransition: React.FC<TowerStageTransitionProps> = ({
+  badgeLabel,
+  disabled = false,
+  children
+}) => {
+  const lineBg = disabled ? 'bg-gray-200 dark:bg-gray-800' : 'bg-indigo-300 dark:bg-indigo-600';
+  const arrowColor = disabled ? 'text-gray-300 dark:text-gray-700' : 'text-indigo-600 dark:text-indigo-400';
+
+  return (
+    <div className="relative w-full py-6 sm:py-8 flex items-center">
+      {/* Left Conduit Lane: contains descending line, intersection badge, horizontal connector, and terminal arrow */}
+      <div className="w-16 sm:w-28 shrink-0 relative self-stretch flex flex-col items-center">
+        {/* Top half of descending line (from matrix above down to intersection) */}
+        <div className={`w-0.5 flex-1 ${lineBg} transition-colors -mt-px`} />
+
+        {/* Intersection Anchor: Badge + Horizontal Connector to the function card */}
+        <div className="relative z-10 flex items-center justify-center my-2 w-full">
+          {/* Horizontal hook connector line branching from intersection to the function card on the right */}
+          <div
+            className={`absolute top-1/2 left-1/2 right-0 h-0.5 -translate-y-1/2 ${lineBg} transition-colors pointer-events-none z-0`}
+          />
+
+          {/* Formula Badge (no downward arrow inside, only the formula) */}
+          <div
+            className={`relative z-10 px-2.5 py-1 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all border shadow-2xs whitespace-nowrap ${
+              disabled
+                ? 'bg-gray-100 dark:bg-gray-850 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700'
+                : 'bg-indigo-50 dark:bg-indigo-950/90 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+            }`}
+          >
+            <span className="font-mono text-[10.5px] font-medium">
+              {typeof badgeLabel === 'string' ? <MathText text={badgeLabel} /> : badgeLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom half of descending line (from intersection down to matrix below) */}
+        <div className={`w-0.5 flex-1 ${lineBg} transition-colors`} />
+
+        {/* Downward Arrow Terminal: A crisp solid arrowhead seamlessly capping the descending line into the next matrix */}
+        <div className="shrink-0 flex items-center justify-center -mt-px z-10">
+          <svg
+            viewBox="0 0 12 8"
+            className={`w-3.5 h-2.5 fill-current ${arrowColor} transition-colors`}
+            aria-hidden="true"
+          >
+            <polygon points="1,0 11,0 6,8" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Function quadrant: narrower width, aligned to right */}
+      <div className="flex-1 min-w-0">
+        {children}
+      </div>
     </div>
-    <div className={`w-0.5 h-3.5 transition-colors ${disabled ? 'bg-gray-200 dark:bg-gray-800' : 'bg-indigo-300 dark:bg-indigo-600'}`} />
-  </div>
-);
+  );
+};
 
 export interface CharacteristicPhaseProps {
   dataset: OrdomaticaDataset;
@@ -465,118 +502,11 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
     }
   };
 
-  // Detail lock keys for the 7 stages of Contextual Affinity
-  const detailLockKeys = ['d', 'fp', 'a', 'vb', 'aa', 'fs', 'ac_detail'] as const;
-  type DetailLockKey = typeof detailLockKeys[number];
-  type LockKey = 'vp' | 'vc' | DetailLockKey;
-
-  const isCardLocked = (key: LockKey): boolean => {
-    return Boolean(activeChar.locks?.[key]);
-  };
-
-  const toggleCardLock = (key: LockKey) => {
-    const current = isCardLocked(key);
-    onUpdateDataset(prev => {
-      const nextChars = [...prev.characteristics];
-      const char = { ...nextChars[activeCharIdx] };
-      const nextLocks = { ...(char.locks || {}) };
-      nextLocks[key] = !current;
-      char.locks = nextLocks;
-      nextChars[activeCharIdx] = char;
-      return { ...prev, characteristics: nextChars };
-    });
-  };
-
-  // Aggregated AC Lock State for Summary Card
-  const acDetailLockedCount = detailLockKeys.filter(k => Boolean(activeChar.locks?.[k])).length;
-  const isAcAllLocked = acDetailLockedCount === detailLockKeys.length;
-  const isAcAllUnlocked = acDetailLockedCount === 0;
-  const isAcPartial = !isAcAllLocked && !isAcAllUnlocked;
-
-  const handleToggleAcSummaryLock = () => {
-    // If partial or all unlocked -> switch to all locked
-    // If all locked -> switch to all unlocked
-    const newTargetState = !isAcAllLocked;
-    onUpdateDataset(prev => {
-      const nextChars = [...prev.characteristics];
-      const char = { ...nextChars[activeCharIdx] };
-      const nextLocks = { ...(char.locks || {}) };
-      detailLockKeys.forEach(k => {
-        nextLocks[k] = newTargetState;
-      });
-      char.locks = nextLocks;
-      nextChars[activeCharIdx] = char;
-      return { ...prev, characteristics: nextChars };
-    });
-  };
-
-  const renderSingleCardLock = (key: LockKey) => {
-    const locked = isCardLocked(key);
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          toggleCardLock(key);
-        }}
-        title={locked ? t('char.lock.lockedTitle') : t('char.lock.unlockedTitle')}
-        aria-label={locked ? t('char.lock.lockedLabel') : t('char.lock.unlockedLabel')}
-        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-2xs border ${
-          locked
-            ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 shadow-xs hover:bg-amber-100 dark:hover:bg-amber-900/40'
-            : 'bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-300 dark:hover:border-amber-700'
-        }`}
-      >
-        {locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-      </button>
-    );
-  };
-
-  const renderAcSummaryLock = () => {
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleToggleAcSummaryLock();
-        }}
-        title={
-          isAcAllLocked
-            ? t('char.lock.acAllLocked')
-            : isAcPartial
-            ? t('char.lock.acPartialLocked')
-            : t('char.lock.acAllUnlocked')
-        }
-        aria-label={t('char.lock.acAriaLabel')}
-        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-2xs border ${
-          isAcAllLocked
-            ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 shadow-xs hover:bg-amber-100 dark:hover:bg-amber-900/40'
-            : isAcPartial
-            ? 'bg-amber-50/70 dark:bg-amber-950/30 text-amber-500 dark:text-amber-400 border-dashed border-amber-400 dark:border-amber-600 shadow-xs hover:bg-amber-100/70'
-            : 'bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-300 dark:hover:border-amber-700'
-        }`}
-      >
-        {isAcAllLocked ? (
-          <Lock className="w-4 h-4" />
-        ) : isAcPartial ? (
-          <div className="relative flex items-center justify-center">
-            <Lock className="w-3.5 h-3.5" />
-            <span className="absolute -bottom-1 -right-1 w-2 h-2 rounded-full bg-amber-500 border border-white dark:border-gray-900" />
-          </div>
-        ) : (
-          <Unlock className="w-4 h-4" />
-        )}
-      </button>
-    );
-  };
-
   const renderMatrixStageAction = (
-    modeKey: string,
-    lockKey: DetailLockKey
+    modeKey: string
   ) => {
     return (
       <div className="flex items-center gap-1.5">
-        {renderSingleCardLock(lockKey)}
         {renderModeToggle(modeKey, true)}
       </div>
     );
@@ -585,12 +515,10 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
   const renderFunctionStageAction = (
     stage: 'fp' | 'vb' | 'fs',
     isDisabled: boolean,
-    lockKey: DetailLockKey,
     extraAction?: React.ReactNode
   ) => {
     return (
       <div className="flex items-center gap-1.5">
-        {renderSingleCardLock(lockKey)}
         <button
           type="button"
           onClick={() => toggleFunctionStage(stage)}
@@ -676,9 +604,6 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
 
     return (
       <div className="flex items-center gap-1.5">
-        {/* Card Lock Button */}
-        {pillar === 'ac' ? renderAcSummaryLock() : renderSingleCardLock(pillar)}
-
         {/* Calculation Target Icon */}
         {isTarget && (
           <div
@@ -1391,16 +1316,14 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                   <button
                     key={tgt.id}
                     type="button"
-                    disabled={!tgt.available || isUnsupported}
+                    disabled={isUnsupported}
                     onClick={() => handleSelectCalcTarget(tgt.id)}
                     className={`p-4 rounded-2xl border text-left transition-all duration-200 relative flex flex-col justify-between ${
                       isSelected
                         ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-400 dark:border-blue-600 shadow-xs ring-2 ring-blue-500/20'
                         : isUnsupported
                         ? 'bg-rose-50/20 dark:bg-rose-950/20 border-rose-200/80 dark:border-rose-900/60 opacity-80 cursor-not-allowed'
-                        : tgt.available
-                        ? 'bg-white dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-gray-50/80 dark:hover:bg-gray-750 cursor-pointer shadow-2xs'
-                        : 'bg-gray-50/60 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed'
+                        : 'bg-white dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-gray-50/80 dark:hover:bg-gray-750 cursor-pointer shadow-2xs'
                     }`}
                   >
                     <div>
@@ -1535,7 +1458,7 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                     )}
                   </div>
                 }
-                action={renderMatrixStageAction('det-dist', 'd')}
+                action={renderMatrixStageAction('det-dist')}
                 className={`transition-all duration-200 ${
                   isDDisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
                 }`}
@@ -1566,118 +1489,133 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                 </div>
               </Card>
 
-              {/* Sequential Connector 1 */}
-              <FlowConnector disabled={isDDisabled} label="D → F_P" />
-
-              {/* 2. Propagation Function (F_P) */}
-              <Card
-                title={
-                  <div className="flex items-center gap-2.5">
-                    <span>{t('char.tower.propagationFunction')}</span>
-                    {isFpDisabled && (
-                      <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-gray-200/80 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
-                        {t('char.tower.disabledBadge')}
-                      </span>
-                    )}
-                  </div>
-                }
-                action={renderFunctionStageAction('fp', isFpDisabled, 'fp')}
-                className={`transition-all duration-200 ${
-                  isFpDisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
-                }`}
+              {/* 2. Propagation Function (F_P) hooked into left descending conduit */}
+              <TowerStageTransition
+                badgeLabel="F_P(D) = A"
+                disabled={isDDisabled || isFpDisabled}
               >
-                <div className={isFpDisabled ? 'pointer-events-none select-none opacity-80' : ''}>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                          {t('char.tower.function')}
-                        </label>
-                        <select
-                          disabled={isFpDisabled}
-                          value={activeChar.prop.type}
-                          onChange={e => updateActiveCharNested('prop', 'type', e.target.value)}
-                          className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
-                        >
-                          <option value="inhibited">{t('char.tower.prop.inhibited')}</option>
-                          <option value="triangular">{t('char.tower.prop.triangular')}</option>
-                          <option value="rectangular">{t('char.tower.prop.rectangular')}</option>
-                          <option value="trapezoidal">{t('char.tower.prop.trapezoidal')}</option>
-                          <option value="sinusoidal">{t('char.tower.prop.sinusoidal')}</option>
-                          <option value="custom">{t('char.tower.prop.custom')}</option>
-                        </select>
+                <Card
+                  title={
+                    <div className="flex items-center gap-2.5">
+                      <span>{t('char.tower.propagationFunction')}</span>
+                      {isFpDisabled && (
+                        <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-gray-200/80 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
+                          {t('char.tower.disabledBadge')}
+                        </span>
+                      )}
+                    </div>
+                  }
+                  action={renderFunctionStageAction('fp', isFpDisabled)}
+                  className={`transition-all duration-200 ${
+                    isFpDisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
+                  }`}
+                >
+                  <div className={isFpDisabled ? 'pointer-events-none select-none opacity-80' : ''}>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                            {t('char.tower.function')}
+                          </label>
+                          <select
+                            disabled={isFpDisabled}
+                            value={activeChar.prop.type}
+                            onChange={e => updateActiveCharNested('prop', 'type', e.target.value)}
+                            className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                          >
+                            <option value="inhibited">{t('char.tower.prop.inhibited')}</option>
+                            <option value="triangular">{t('char.tower.prop.triangular')}</option>
+                            <option value="rectangular">{t('char.tower.prop.rectangular')}</option>
+                            <option value="trapezoidal">{t('char.tower.prop.trapezoidal')}</option>
+                            <option value="sinusoidal">{t('char.tower.prop.sinusoidal')}</option>
+                            <option value="custom">{t('char.tower.prop.custom')}</option>
+                          </select>
+                          <FormulaCodeDisplay
+                            code={
+                              activeChar.prop.type === 'inhibited'
+                                ? '0'
+                                : activeChar.prop.type === 'triangular'
+                                ? 'd <= L ? (L - d) / L : 0'
+                                : activeChar.prop.type === 'rectangular'
+                                ? 'd <= L ? 1 : 0'
+                                : activeChar.prop.type === 'trapezoidal'
+                                ? 'd <= L1 ? 1 : (d <= L ? (L - d) / (L - L1) : 0)'
+                                : activeChar.prop.type === 'sinusoidal'
+                                ? 'd <= L ? 0.5 * (1 + cos(pi * d / L)) : 0'
+                                : activeChar.prop.customExpr || 'exp(-d / 2)'
+                            }
+                            className="mt-2"
+                          />
+                        </div>
+
+                        {activeChar.prop.type === 'trapezoidal' && (
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                              {t('char.tower.limitL1')}
+                            </label>
+                            <DecimalInput
+                              disabled={isFpDisabled}
+                              value={activeChar.prop.l1 ?? 0}
+                              onChange={val => updateActiveCharNested('prop', 'l1', val)}
+                              className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                            />
+                          </div>
+                        )}
+
+                        {/* Custom propagation removes limit parameter as requested */}
+                        {['triangular', 'rectangular', 'trapezoidal', 'sinusoidal'].includes(activeChar.prop.type) && (
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                              {activeChar.prop.type === 'trapezoidal' ? t('char.tower.limitL2') : t('char.tower.limit')}
+                            </label>
+                            <DecimalInput
+                              disabled={isFpDisabled}
+                              value={activeChar.prop.limit}
+                              onChange={val => updateActiveCharNested('prop', 'limit', val)}
+                              className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                            />
+                          </div>
+                        )}
+
+                        {activeChar.prop.type === 'custom' && (
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                              {t('char.tower.prop.customExpr')}
+                            </label>
+                            <input
+                              type="text"
+                              disabled={isFpDisabled}
+                              value={activeChar.prop.customExpr || ''}
+                              placeholder="exp(-d / 2)"
+                              onChange={e => updateActiveCharNested('prop', 'customExpr', e.target.value)}
+                              className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                            />
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {['exp(-d / 2)', '1 / (1 + d)', 'max(0, 1 - (d / 5)^2)', 'cos(pi * d / 10)'].map(expr => (
+                                <button
+                                  key={expr}
+                                  type="button"
+                                  disabled={isFpDisabled}
+                                  onClick={() => updateActiveCharNested('prop', 'customExpr', expr)}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors font-mono cursor-pointer disabled:pointer-events-none disabled:opacity-50"
+                                >
+                                  <MathText text={expr} />
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{t('char.tower.prop.customExprHelp')}</p>
+                          </div>
+                        )}
                       </div>
 
-                      {activeChar.prop.type === 'trapezoidal' && (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                            {t('char.tower.limitL1')}
-                          </label>
-                          <DecimalInput
-                            disabled={isFpDisabled}
-                            value={activeChar.prop.l1 ?? 0}
-                            onChange={val => updateActiveCharNested('prop', 'l1', val)}
-                            className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
-                          />
-                        </div>
-                      )}
-
-                      {/* Custom propagation removes limit parameter as requested */}
-                      {['triangular', 'rectangular', 'trapezoidal', 'sinusoidal'].includes(activeChar.prop.type) && (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                            {activeChar.prop.type === 'trapezoidal' ? t('char.tower.limitL2') : t('char.tower.limit')}
-                          </label>
-                          <DecimalInput
-                            disabled={isFpDisabled}
-                            value={activeChar.prop.limit}
-                            onChange={val => updateActiveCharNested('prop', 'limit', val)}
-                            className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
-                          />
-                        </div>
-                      )}
-
-                      {activeChar.prop.type === 'custom' && (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                            {t('char.tower.prop.customExpr')}
-                          </label>
-                          <input
-                            type="text"
-                            disabled={isFpDisabled}
-                            value={activeChar.prop.customExpr || ''}
-                            placeholder="exp(-d / 2)"
-                            onChange={e => updateActiveCharNested('prop', 'customExpr', e.target.value)}
-                            className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
-                          />
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {['exp(-d / 2)', '1 / (1 + d)', 'max(0, 1 - (d / 5)^2)', 'cos(pi * d / 10)'].map(expr => (
-                              <button
-                                key={expr}
-                                type="button"
-                                disabled={isFpDisabled}
-                                onClick={() => updateActiveCharNested('prop', 'customExpr', expr)}
-                                className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors font-mono cursor-pointer disabled:pointer-events-none disabled:opacity-50"
-                              >
-                                <MathText text={expr} />
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{t('char.tower.prop.customExprHelp')}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Live Graphical Representation of Propagation */}
-                    <div>
-                      <PropagationGraph prop={activeChar.prop} />
+                      {/* Live Graphical Representation of Propagation */}
+                      <div>
+                        <PropagationGraph prop={activeChar.prop} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-
-              {/* Sequential Connector 2 */}
-              <FlowConnector disabled={isFpDisabled} label="F_P(D) = A" />
+                </Card>
+              </TowerStageTransition>
 
               {/* 3. Affinity Matrix (A) */}
               <Card
@@ -1696,7 +1634,7 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                     )}
                   </div>
                 }
-                action={renderMatrixStageAction('det-aff', 'a')}
+                action={renderMatrixStageAction('det-aff')}
                 className={`transition-all duration-200 ${
                   isADisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
                 }`}
@@ -1730,113 +1668,120 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                 </div>
               </Card>
 
-              {/* Sequential Connector 3 */}
-              <FlowConnector disabled={isADisabled} label="A + V^B" />
-
-              {/* 4. Blocking Function (F_B / V^B) */}
-              <Card
-                title={
-                  <div className="flex items-center gap-2.5">
-                    <span>{t('char.tower.blockingFunction')}</span>
-                    {isVbDisabled && (
-                      <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-gray-200/80 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
-                        {t('char.tower.disabledBadge')}
-                      </span>
-                    )}
-                  </div>
-                }
-                action={renderFunctionStageAction('vb', isVbDisabled, 'vb')}
-                className={`transition-all duration-200 ${
-                  isVbDisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
-                }`}
+              {/* 4. Blocking Function (F_B / V^B) hooked into left descending conduit */}
+              <TowerStageTransition
+                badgeLabel="F_B(A, V^B) = A^A"
+                disabled={isADisabled || isVbDisabled}
               >
-                <div className={isVbDisabled ? 'pointer-events-none select-none opacity-80' : ''}>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                        {t('char.tower.function')}
-                      </label>
-                      <select
-                        disabled={isVbDisabled}
-                        value={activeChar.block?.type || 'standard'}
-                        onChange={e => updateActiveCharNested('block', 'type', e.target.value)}
-                        className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
-                      >
-                        <option value="standard">{t('char.tower.block.standard')}</option>
-                        <option value="custom">{t('char.tower.block.custom')}</option>
-                      </select>
+                <Card
+                  title={
+                    <div className="flex items-center gap-2.5">
+                      <span>{t('char.tower.blockingFunction')}</span>
+                      {isVbDisabled && (
+                        <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-gray-200/80 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
+                          {t('char.tower.disabledBadge')}
+                        </span>
+                      )}
                     </div>
-
-                    {/* Standard blocking parameters: each position of vector VB */}
-                    {(activeChar.block?.type || 'standard') === 'standard' && (
+                  }
+                  action={renderFunctionStageAction('vb', isVbDisabled)}
+                  className={`transition-all duration-200 ${
+                    isVbDisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
+                  }`}
+                >
+                  <div className={isVbDisabled ? 'pointer-events-none select-none opacity-80' : ''}>
+                    <div className="space-y-4">
                       <div>
                         <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                          {t('char.tower.block.vectorParams')}
+                          {t('char.tower.function')}
                         </label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          {elements.map((el, i) => (
-                            <div key={i} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/60 p-2 rounded-lg border border-gray-100 dark:border-gray-800">
-                              <OrbBadge
-                                name={el}
-                                image={dataset.elementImages?.[i]}
-                                size="xs"
-                                color="indigo"
-                              />
-                              <BlockingVectorInput
-                                disabled={isVbDisabled}
-                                value={activeChar.vb[i] ?? 0}
-                                onChange={val => {
-                                  const newVb = [...activeChar.vb];
-                                  newVb[i] = val;
-                                  updateActiveChar('vb', newVb);
-                                }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Custom blocking: single parameter input for custom formula */}
-                    {activeChar.block?.type === 'custom' && (
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                          {t('char.tower.block.customExpr')}
-                        </label>
-                        <input
-                          type="text"
+                        <select
                           disabled={isVbDisabled}
-                          value={activeChar.block?.customExpr || ''}
-                          placeholder="i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))"
-                          onChange={e => updateActiveCharNested('block', 'customExpr', e.target.value)}
-                          className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                          value={activeChar.block?.type || 'standard'}
+                          onChange={e => updateActiveCharNested('block', 'type', e.target.value)}
+                          className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                        >
+                          <option value="standard">{t('char.tower.block.standard')}</option>
+                          <option value="custom">{t('char.tower.block.custom')}</option>
+                        </select>
+                        <FormulaCodeDisplay
+                          code={
+                            activeChar.block?.type === 'custom'
+                              ? activeChar.block.customExpr || 'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))'
+                              : 'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))'
+                          }
+                          className="mt-2"
                         />
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {[
-                            'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))',
-                            'i == j ? 1 : (a < 0.2 ? 0 : a)',
-                            'i == j ? 1 / S : a / S'
-                          ].map(expr => (
-                            <button
-                              key={expr}
-                              type="button"
-                              disabled={isVbDisabled}
-                              onClick={() => updateActiveCharNested('block', 'customExpr', expr)}
-                              className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors font-mono cursor-pointer disabled:pointer-events-none disabled:opacity-50"
-                            >
-                              <MathText text={expr} />
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{t('char.tower.block.customExprHelp')}</p>
                       </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
 
-              {/* Sequential Connector 4 */}
-              <FlowConnector disabled={isVbDisabled} label={t('char.tower.autoinductionLabel')} />
+                      {/* Standard blocking parameters: each position of vector VB */}
+                      {(activeChar.block?.type || 'standard') === 'standard' && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                            {t('char.tower.block.vectorParams')}
+                          </label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {elements.map((el, i) => (
+                              <div key={i} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/60 p-2 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <OrbBadge
+                                  name={el}
+                                  image={dataset.elementImages?.[i]}
+                                  size="xs"
+                                  color="indigo"
+                                />
+                                <BlockingVectorInput
+                                  disabled={isVbDisabled}
+                                  value={activeChar.vb[i] ?? 0}
+                                  onChange={val => {
+                                    const newVb = [...activeChar.vb];
+                                    newVb[i] = val;
+                                    updateActiveChar('vb', newVb);
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Custom blocking: single parameter input for custom formula */}
+                      {activeChar.block?.type === 'custom' && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                            {t('char.tower.block.customExpr')}
+                          </label>
+                          <input
+                            type="text"
+                            disabled={isVbDisabled}
+                            value={activeChar.block?.customExpr || ''}
+                            placeholder="i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))"
+                            onChange={e => updateActiveCharNested('block', 'customExpr', e.target.value)}
+                            className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                          />
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {[
+                              'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))',
+                              'i == j ? 1 : (a < 0.2 ? 0 : a)',
+                              'i == j ? 1 / S : a / S'
+                            ].map(expr => (
+                              <button
+                                key={expr}
+                                type="button"
+                                disabled={isVbDisabled}
+                                onClick={() => updateActiveCharNested('block', 'customExpr', expr)}
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors font-mono cursor-pointer disabled:pointer-events-none disabled:opacity-50"
+                              >
+                                <MathText text={expr} />
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{t('char.tower.block.customExprHelp')}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </TowerStageTransition>
 
               {/* 5. Autoinduced Matrix (A^A) */}
               <Card
@@ -1855,7 +1800,7 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                     )}
                   </div>
                 }
-                action={renderMatrixStageAction('det-auto', 'aa')}
+                action={renderMatrixStageAction('det-auto')}
                 className={`transition-all duration-200 ${
                   isAADisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
                 }`}
@@ -1889,100 +1834,109 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                 </div>
               </Card>
 
-              {/* Sequential Connector 5 */}
-              <FlowConnector disabled={isAADisabled} label="A^A → F_S" />
-
-              {/* 6. Synergy Function (F_S) */}
-              <Card
-                title={
-                  <div className="flex items-center gap-2.5">
-                    <span>{t('char.tower.synergyFunction')}</span>
-                    {isFsDisabled && (
-                      <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-gray-200/80 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
-                        {t('char.tower.disabledBadge')}
-                      </span>
-                    )}
-                  </div>
-                }
-                action={renderFunctionStageAction('fs', isFsDisabled, 'fs')}
-                className={`transition-all duration-200 ${
-                  isFsDisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
-                }`}
+              {/* 6. Synergy Function (F_S) hooked into left descending conduit */}
+              <TowerStageTransition
+                badgeLabel="F_S(A^A) = A^C"
+                disabled={isAADisabled || isFsDisabled}
               >
-                <div className={isFsDisabled ? 'pointer-events-none select-none opacity-80' : ''}>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                          {t('char.tower.function')}
-                        </label>
-                        <select
-                          disabled={isFsDisabled}
-                          value={activeChar.syn.type}
-                          onChange={e => updateActiveCharNested('syn', 'type', e.target.value)}
-                          className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
-                        >
-                          <option value="none">{t('char.tower.syn.none')}</option>
-                          <option value="factor">{t('char.tower.syn.factor')}</option>
-                          <option value="custom">{t('char.tower.syn.custom')}</option>
-                        </select>
+                <Card
+                  title={
+                    <div className="flex items-center gap-2.5">
+                      <span>{t('char.tower.synergyFunction')}</span>
+                      {isFsDisabled && (
+                        <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-gray-200/80 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
+                          {t('char.tower.disabledBadge')}
+                        </span>
+                      )}
+                    </div>
+                  }
+                  action={renderFunctionStageAction('fs', isFsDisabled)}
+                  className={`transition-all duration-200 ${
+                    isFsDisabled ? 'opacity-55 grayscale-[35%] bg-gray-50/70 dark:bg-gray-950/40 border-dashed border-gray-300 dark:border-gray-700' : ''
+                  }`}
+                >
+                  <div className={isFsDisabled ? 'pointer-events-none select-none opacity-80' : ''}>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                            {t('char.tower.function')}
+                          </label>
+                          <select
+                            disabled={isFsDisabled}
+                            value={activeChar.syn.type}
+                            onChange={e => updateActiveCharNested('syn', 'type', e.target.value)}
+                            className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                          >
+                            <option value="none">{t('char.tower.syn.none')}</option>
+                            <option value="factor">{t('char.tower.syn.factor')}</option>
+                            <option value="custom">{t('char.tower.syn.custom')}</option>
+                          </select>
+                          <FormulaCodeDisplay
+                            code={
+                              activeChar.syn.type === 'none'
+                                ? 'a'
+                                : activeChar.syn.type === 'factor'
+                                ? 'a * k'
+                                : activeChar.syn.customExpr || 'min(1, a * 1.2)'
+                            }
+                            className="mt-2"
+                          />
+                        </div>
+
+                        {activeChar.syn.type === 'factor' && (
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                              {t('char.tower.factorK')}
+                            </label>
+                            <DecimalInput
+                              disabled={isFsDisabled}
+                              value={activeChar.syn.k}
+                              onChange={val => updateActiveCharNested('syn', 'k', val)}
+                              className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                            />
+                          </div>
+                        )}
+
+                        {activeChar.syn.type === 'custom' && (
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                              {t('char.tower.syn.customExpr')}
+                            </label>
+                            <input
+                              type="text"
+                              disabled={isFsDisabled}
+                              value={activeChar.syn.customExpr || ''}
+                              placeholder="min(1, a * 1.2)"
+                              onChange={e => updateActiveCharNested('syn', 'customExpr', e.target.value)}
+                              className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
+                            />
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {['min(1, a * 1.2)', 'pow(a, 0.8)', 'a * (1 + 0.5 * (1 - a))', 'sqrt(a)'].map(expr => (
+                                <button
+                                  key={expr}
+                                  type="button"
+                                  disabled={isFsDisabled}
+                                  onClick={() => updateActiveCharNested('syn', 'customExpr', expr)}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors font-mono cursor-pointer disabled:pointer-events-none disabled:opacity-50"
+                                >
+                                  {expr}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{t('char.tower.syn.customExprHelp')}</p>
+                          </div>
+                        )}
                       </div>
 
-                      {activeChar.syn.type === 'factor' && (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                            {t('char.tower.factorK')}
-                          </label>
-                          <DecimalInput
-                            disabled={isFsDisabled}
-                            value={activeChar.syn.k}
-                            onChange={val => updateActiveCharNested('syn', 'k', val)}
-                            className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
-                          />
-                        </div>
-                      )}
-
-                      {activeChar.syn.type === 'custom' && (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-                            {t('char.tower.syn.customExpr')}
-                          </label>
-                          <input
-                            type="text"
-                            disabled={isFsDisabled}
-                            value={activeChar.syn.customExpr || ''}
-                            placeholder="min(1, a * 1.2)"
-                            onChange={e => updateActiveCharNested('syn', 'customExpr', e.target.value)}
-                            className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 dark:disabled:bg-gray-850"
-                          />
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {['min(1, a * 1.2)', 'pow(a, 0.8)', 'a * (1 + 0.5 * (1 - a))', 'sqrt(a)'].map(expr => (
-                              <button
-                                key={expr}
-                                type="button"
-                                disabled={isFsDisabled}
-                                onClick={() => updateActiveCharNested('syn', 'customExpr', expr)}
-                                className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors font-mono cursor-pointer disabled:pointer-events-none disabled:opacity-50"
-                              >
-                                {expr}
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{t('char.tower.syn.customExprHelp')}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Live Graphical Representation of Synergy */}
-                    <div>
-                      <SynergyGraph syn={activeChar.syn} />
+                      {/* Live Graphical Representation of Synergy */}
+                      <div>
+                        <SynergyGraph syn={activeChar.syn} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-
-              {/* Sequential Connector 6 */}
-              <FlowConnector disabled={isFsDisabled} label="F_S(A^A) = A^C" />
+                </Card>
+              </TowerStageTransition>
 
               {/* 7. Contextual Affinity Matrix (A^C) */}
               <Card
@@ -1996,12 +1950,7 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                     )}
                   </div>
                 }
-                action={
-                  <div className="flex items-center gap-1.5">
-                    {renderSingleCardLock('ac_detail')}
-                    {renderModeToggle('det-contextual', true)}
-                  </div>
-                }
+                action={renderMatrixStageAction('det-contextual')}
               >
                 <div>
                   {isGraphMode('det-contextual') ? (
@@ -2359,6 +2308,10 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                           )
                       )}
                     </select>
+                    <FormulaCodeDisplay
+                      code={activeChar.adj.byPop === -1 ? 'vc' : 'vc / pop'}
+                      className="mt-2.5"
+                    />
                   </div>
                 </div>
               </Card>
@@ -2385,6 +2338,16 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                       <option value="maximum">{t('char.adj.norm.maximum')}</option>
                       <option value="target">{t('char.adj.norm.target')}</option>
                     </select>
+                    <FormulaCodeDisplay
+                      code={
+                        activeChar.adj.normType === 'none'
+                          ? 'vcr'
+                          : activeChar.adj.normType === 'target'
+                          ? 'min(1, vcr / obj)'
+                          : 'min(1, vcr / max_vcr)'
+                      }
+                      className="mb-3"
+                    />
                     {activeChar.adj.normType === 'target' && (
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1.5">

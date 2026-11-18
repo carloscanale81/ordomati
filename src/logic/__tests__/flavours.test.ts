@@ -248,6 +248,49 @@ test('parseSoccerTimeline handles red card / expulsion cut-points and player eje
   assert.ok(expSeg?.startReason?.description.includes('Cristian Romero'), 'Expulsion reason must state expelled player');
 });
 
+test('parseSoccerTimeline correctly parses 90-minute regulation match with stoppage time events', () => {
+  const match90 = {
+    matchId: 1999999,
+    score: '2 : 1',
+    period: 'FullTime',
+    periodCode: 2,
+    home: {
+      name: 'Real Madrid',
+      players: [
+        { playerId: 1, name: 'Courtois', isFirstEleven: true, position: 'GK', shirtNo: 1 },
+        { playerId: 2, name: 'Vinicius', isFirstEleven: true, position: 'FW', shirtNo: 7 }
+      ],
+      substitutions: [
+        { minute: 92, playerOff: 'Vinicius', playerOn: 'Rodrygo', shirtNo: 11, position: 'FW' }
+      ]
+    },
+    away: {
+      name: 'Barcelona',
+      players: [
+        { playerId: 10, name: 'Ter Stegen', isFirstEleven: true, position: 'GK', shirtNo: 1 },
+        { playerId: 11, name: 'Pedri', isFirstEleven: true, position: 'MF', shirtNo: 8 }
+      ],
+      substitutions: []
+    },
+    events: [
+      { minute: 23, type: 'Goal', player: 'Vinicius', outcome: 'Successful', team: 'Real Madrid' },
+      { minute: 93, type: 'Card', player: 'Pedri', cardType: 'Yellow', team: 'Barcelona' }
+    ]
+  };
+
+  const timeline = parseSoccerTimeline(match90);
+  assert.equal(timeline.totalMinutes, 90, 'Regulation match must have totalMinutes === 90');
+  assert.equal(timeline.homeSegments[0].startMinute, 0);
+  assert.equal(timeline.homeSegments[timeline.homeSegments.length - 1].endMinute, 90);
+  assert.equal(timeline.awaySegments[timeline.awaySegments.length - 1].endMinute, 90);
+
+  // Sum of segment durations must equal 90 minutes
+  const homeDurationSum = timeline.homeSegments.reduce((sum, s) => sum + s.duration, 0);
+  const awayDurationSum = timeline.awaySegments.reduce((sum, s) => sum + s.duration, 0);
+  assert.equal(homeDurationSum, 90, 'Home segments duration must sum to exactly 90');
+  assert.equal(awayDurationSum, 90, 'Away segments duration must sum to exactly 90');
+});
+
 test('computeSoccerDimensionalAnalysis generates A matrix, applies synergy to AC, and solves VP', () => {
   const matchData = createRecreationMatchData2007644();
   const timeline = parseSoccerTimeline(matchData);
@@ -264,10 +307,13 @@ test('computeSoccerDimensionalAnalysis generates A matrix, applies synergy to AC
   assert.equal(pendingAnalysis.VC.length, 11);
 
   // A matrix must have diagonal of 1 and off-diagonal = passes / maxPasses
+  // AAI and AC are autoinduced conservation matrices preserving unit row sum
   for (let i = 0; i < 11; i++) {
     assert.equal(pendingAnalysis.A[i][i], 1, `Diagonal A[${i}][${i}] must be 1`);
-    assert.equal(pendingAnalysis.AAI[i][i], 1, `Diagonal AAI[${i}][${i}] must be 1 (no blocking)`);
-    assert.equal(pendingAnalysis.AC[i][i], 1, `Diagonal AC[${i}][${i}] must be 1`);
+    const aaiRowSum = pendingAnalysis.AAI[i].reduce((a, b) => a + b, 0);
+    const acRowSum = pendingAnalysis.AC[i].reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(aaiRowSum - 1.0) < 1e-4, `Row ${i} of AAI must sum to 1.0`);
+    assert.ok(Math.abs(acRowSum - 1.0) < 1e-4, `Row ${i} of AC must sum to 1.0`);
   }
 
   // 2. Solved calculation: VP is solved via matrix inversion (AC)^(-1) * VC
@@ -279,6 +325,14 @@ test('computeSoccerDimensionalAnalysis generates A matrix, applies synergy to AC
     assert.ok(Number.isFinite(val), `VP[${idx}] must be a finite number`);
     assert.ok(val >= 0, `VP[${idx}] must be non-negative`);
   });
+
+  // Strict value conservation: with synergy factor k=1.0 (or none), sum(VP) == sum(VC)
+  const sumVC = solvedAnalysis.VC.reduce((a, b) => a + b, 0);
+  const sumVP = solvedAnalysis.VP!.reduce((a, b) => a + b, 0);
+  assert.ok(
+    Math.abs(sumVP - sumVC) < 1e-3,
+    `Total value must be conserved without synergy: sum(VP)=${sumVP} vs sum(VC)=${sumVC}`
+  );
 
   // 3. Synergy factor modulation
   const factorAnalysis = computeSoccerDimensionalAnalysis(matchData, firstSeg, true, { type: 'factor', k: 0.5 });
@@ -624,12 +678,22 @@ test('Pipeline configuration functions and defaults (propagation, blocking, syne
     }
   }
 
-  // Without blocking or synergy, AC should equal A
+  // Without blocking or synergy, AC should equal AAI, and both preserve unit row sum
   for (let i = 0; i < dim.players.length; i++) {
     for (let j = 0; j < dim.players.length; j++) {
-      assert.equal(dim.AC[i][j], dim.A[i][j]);
+      assert.equal(dim.AC[i][j], dim.AAI[i][j]);
     }
+    const acRowSum = dim.AC[i].reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(acRowSum - 1.0) < 1e-4, `Row ${i} of AC must sum to 1.0`);
   }
+
+  // Value conservation: sum(VP) == sum(VC)
+  const sumVC = dim.VC.reduce((a, b) => a + b, 0);
+  const sumVP = dim.VP!.reduce((a, b) => a + b, 0);
+  assert.ok(
+    Math.abs(sumVP - sumVC) < 1e-3,
+    `Total value must be conserved: sum(VP)=${sumVP} vs sum(VC)=${sumVC}`
+  );
 
   // 2. Propagation triangular option
   const dimTri = computeSoccerDimensionalAnalysis(

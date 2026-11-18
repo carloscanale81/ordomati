@@ -435,6 +435,14 @@ export function generateOrdomaticsPdfReportHtml(options: OrdomaticsReportOptions
     </div>
   </header>
 
+  ${dataset.description ? `
+  <section style="margin-bottom: 16px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3.5px solid #2563eb; border-radius: 6px;">
+    <div style="font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #2563eb; margin-bottom: 3px;">
+      ${isEs ? 'Descripción del Análisis' : 'Analysis Description'}
+    </div>
+    <div style="font-size: 8.5pt; color: #334155; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(dataset.description)}</div>
+  </section>` : ''}
+
   <!-- EXECUTIVE SUMMARY HERO -->
   <section class="summary-hero">
     <div class="hero-winner">

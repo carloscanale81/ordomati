@@ -1,5 +1,30 @@
-import { BlockingConfig, Characteristic, PropagationConfig, SynergyConfig } from './types';
+import {
+  BlockingConfig,
+  Characteristic,
+  EqualizationConfig,
+  EqualizationOptions,
+  PropagationConfig,
+  RelativeAdjustmentConfig,
+  SynergyConfig
+} from './types';
 import { evaluateMathExpression } from './mathExpression';
+
+export interface ComputeAffinityMatrixOptions {
+  extraScope?: Record<string, number>;
+  precision?: number;
+}
+
+export interface RelativeAdjustmentOptions {
+  type?: 'byPop' | 'byMinutes' | 'byTouches' | 'byMean' | 'none' | 'custom';
+  byPop?: number;
+  customExpr?: string;
+  populationVC?: number[];
+  duration?: number;
+  totalDuration?: number;
+  touches?: number[];
+  meanVC?: number;
+  extraScope?: Record<string, number>;
+}
 
 const MATH_SCOPE: Record<string, any> = {
   exp: Math.exp,
@@ -30,10 +55,15 @@ export const evaluateCustomPropagation = (
   d: number,
   limit: number,
   l1: number,
-  expr: string
+  expr: string,
+  extraScope?: Record<string, number>
 ): number => {
   if (!expr || !expr.trim()) return 0;
-  const res = evaluateMathExpression(expr, { d, L: limit, L1: l1, L2: limit }, 0);
+  const res = evaluateMathExpression(
+    expr,
+    { d, L: limit, L1: l1, L2: limit, cut: limit, ...extraScope },
+    0
+  );
   return Math.max(0, Math.min(1, Number.isFinite(res) ? res : 0));
 };
 
@@ -50,40 +80,69 @@ export const evaluateCustomPropagation = (
  * - Custom: user-defined mathematical function f(d, L).
  * - Inhibited: no propagation occurs between distinct elements (a_ij = 0 for i != j).
  */
-export const computeAffinityMatrix = (d: (number | null | undefined)[][], prop: PropagationConfig): number[][] => {
+export const computeAffinityMatrix = (
+  d: (number | null | undefined)[][],
+  prop: PropagationConfig,
+  options?: ComputeAffinityMatrixOptions
+): number[][] => {
+  const l1 = prop.l1 || 0;
+  const l2 = (typeof prop.limit === 'number' && prop.limit > 0) ? prop.limit : 1;
+  const precision = options?.precision ?? 4;
+
   return d.map((row, i) =>
     row.map((val, j) => {
       // Direct self-identity: identical elements always have full affinity
-      if (i === j) return 1;
+      if (i === j) return 1.0;
 
       // When there are no distance values entered for distinct elements (val is null/undefined/NaN),
-      // it is not distance 0 (not full affinity); it represents no distance data, yielding 0 affinity.
+      // it represents no distance data, yielding 0 affinity.
       if (val === null || val === undefined || !Number.isFinite(val)) {
-        return 0;
+        return 0.0;
       }
 
-      // Explicit distance 0 between distinct elements
-      if (val === 0) return 1;
+      // Max ratio propagation (e.g. passes / maxPasses or interaction counts)
+      if (prop.type === 'maxRatio') {
+        const ratio = l2 > 0 ? val / l2 : 0;
+        const clamped = Math.max(0, Math.min(1, ratio));
+        return options?.precision !== undefined ? Number(clamped.toFixed(options.precision)) : clamped;
+      }
 
-      const l1 = prop.l1 || 0;
-      const l2 = prop.limit || 1;
+      // Explicit distance 0 between distinct elements in physical distance metric
+      if (val === 0) return 1.0;
 
+      let result = 0;
       switch (prop.type) {
         case 'triangular':
-          return val <= l2 ? (l2 - val) / l2 : 0;
-        case 'rectangular':
-          return val <= l2 ? 1 : 0;
+          result = val <= l2 ? (l2 - val) / l2 : 0;
+          break;
+        case 'rectangular': {
+          const cut = options?.extraScope?.cut;
+          result = cut !== undefined ? (val >= cut ? 1.0 : 0.0) : (val <= l2 ? 1.0 : 0.0);
+          break;
+        }
         case 'trapezoidal':
-          return val <= l1 ? 1 : val <= l2 ? (l2 - val) / (l2 - l1 || 1) : 0;
+          result = val <= l1 ? 1.0 : val <= l2 ? (l2 - val) / (l2 - l1 || 1) : 0;
+          break;
         case 'sinusoidal':
-          return val <= l2 ? 0.5 * (1 + Math.cos(Math.PI * (val / l2))) : 0;
+          result = val <= l2 ? 0.5 * (1 + Math.cos(Math.PI * (val / l2))) : 0;
+          break;
         case 'custom':
-          return evaluateCustomPropagation(val, l2, l1, prop.customExpr || 'exp(-d / 2)');
+          result = evaluateCustomPropagation(
+            val,
+            l2,
+            l1,
+            prop.customExpr || 'exp(-d / 2)',
+            options?.extraScope
+          );
+          break;
         case 'inhibited':
-          return 0;
+          result = 0;
+          break;
         default:
-          return 0;
+          result = l2 > 0 ? val / l2 : 0;
       }
+      const clamped = Math.max(0, Math.min(1, result));
+      return options?.precision !== undefined ? Number(clamped.toFixed(options.precision)) : clamped;
     })
   );
 };
@@ -91,23 +150,33 @@ export const computeAffinityMatrix = (d: (number | null | undefined)[][], prop: 
 /**
  * Computes the Autoinduced Affinity Matrix A^A from affinity A and blocking vector V^B (or custom blocking function).
  * 
- * Mathematical Formulation (Standard Blocking from Thesis):
- * FB(A, V^B, i, j) =
- *   - For i = j:   (1 / sum_k(a_ik))^(1 - v_i^b)
- *   - For i != j:  [a_ij / (sum_k(a_ik) - 1)] * (1 - (1 / sum_k(a_ik))^(1 - v_i^b))
- * 
- * When v_i^b = 1 (full block), s_i = 1 (complete self-retention, a^A_ij = 0 for j != i).
- * When v_i^b = 0 (no block), s_i = 1 / S_i (proportional balance a^A_ij = a_ij / S_i).
- * Unit conservation is preserved analytically: sum_j(a^A_ij) = 1 for all rows.
+ * Mathematical Formulation:
+ * - Standard Blocking (Doctoral Thesis):
+ *   FB(A, V^B, i, j) =
+ *     - For i = j:   (1 / sum_k(a_ik))^(1 - v_i^b)
+ *     - For i != j:  [a_ij / (sum_k(a_ik) - 1)] * (1 - (1 / sum_k(a_ik))^(1 - v_i^b))
+ * - Threshold Blocking:
+ *     - For i = j:   1.0
+ *     - For i != j:  a_ij < theta ? 0.0 : a_ij
+ * - None:
+ *     - A^A = A directly.
+ * - Custom:
+ *     - User-defined expression f(a, S, vb, theta, i, j).
  */
 export const computeAutoinducedAffinity = (
   A: number[][],
-  vb: number[],
+  vb: number[] = [],
   blockConfig?: BlockingConfig
 ): number[][] => {
   const blockType = blockConfig?.type || 'standard';
+  const theta = typeof blockConfig?.threshold === 'number' ? blockConfig.threshold : 0.15;
 
-  return A.map((row, i) => {
+  return A.map((rawRow, i) => {
+    // If threshold blocking is active, prune connections below threshold theta first
+    const row = blockType === 'threshold'
+      ? rawRow.map((val, j) => (i === j ? 1.0 : val < theta ? 0.0 : val))
+      : rawRow;
+
     const rowSum = row.reduce((acc, v) => acc + v, 0);
 
     // If an alternative has no connection with any other element
@@ -115,7 +184,8 @@ export const computeAutoinducedAffinity = (
       return row.map((_, j) => (i === j ? 1 : 0));
     }
 
-    const blockFactor = vb[i] ?? 0;
+    // In 'none' blocking, blocking factor is strictly 0 (no blocking / pure proportional distribution)
+    const blockFactor = blockType === 'none' ? 0 : (vb[i] ?? 0);
 
     if (blockType === 'custom' && blockConfig?.customExpr) {
       const customExpr = blockConfig.customExpr;
@@ -130,6 +200,8 @@ export const computeAutoinducedAffinity = (
           sum: rowSum,
           vb: blockFactor,
           v: blockFactor,
+          theta,
+          umbral: theta,
           i,
           j
         };
@@ -138,7 +210,8 @@ export const computeAutoinducedAffinity = (
       });
     }
 
-    // Standard blocking: power formula from doctoral thesis image
+    // Standard blocking: power formula from doctoral thesis
+    // For blockFactor = 0 (or 'none'), s_val = 1 / rowSum, and each cell is val / rowSum (row sum = 1.0)
     const s_val = Math.pow(1 / rowSum, 1 - blockFactor);
 
     return row.map((val, j) => (i === j ? s_val : (val / (rowSum - 1)) * (1 - s_val)));
@@ -439,19 +512,47 @@ export const invertMatrix = (A: number[][]): number[][] => {
  */
 export const computeInverseContextualValue = (
   VC: number[],
-  AC: number[][]
+  AC: number[][],
+  options?: { preserveSum?: boolean }
 ): { vp: number[]; isQuasiInverse: boolean; invAC: number[][] } => {
   const n = VC.length;
   if (n === 0) return { vp: [], isQuasiInverse: false, invAC: [] };
   const { matrix: invAC, isQuasiInverse } = invertMatrixDetailed(AC);
-  const vp: number[] = [];
+  const unconstrained: number[] = [];
+  let unconstrainedSum = 0;
   for (let j = 0; j < n; j++) {
     let sum = 0;
     for (let k = 0; k < n; k++) {
       sum += (VC[k] || 0) * (invAC[k]?.[j] || 0);
     }
-    vp.push(Math.max(0, sum));
+    unconstrained.push(sum);
+    unconstrainedSum += sum;
   }
+
+  const hasNegative = unconstrained.some(v => v < 0);
+  if (!hasNegative) {
+    return { vp: unconstrained.map(v => Math.max(0, v)), isQuasiInverse, invAC };
+  }
+
+  // Non-negative projection with unit value conservation:
+  // When matrix inversion produces negative components due to cross-coupling,
+  // proportional scaling ensures non-negativity (vp >= 0) while strictly conserving
+  // the exact total system value (sum(vp) == unconstrainedSum).
+  const positive = unconstrained.map(v => Math.max(0, v));
+  const positiveSum = positive.reduce((a, b) => a + b, 0);
+
+  let vp: number[];
+  if (options?.preserveSum ?? true) {
+    if (positiveSum > 0 && unconstrainedSum > 0) {
+      const scale = unconstrainedSum / positiveSum;
+      vp = positive.map(v => v * scale);
+    } else {
+      vp = positive;
+    }
+  } else {
+    vp = positive;
+  }
+
   return { vp, isQuasiInverse, invAC };
 };
 
@@ -536,59 +637,211 @@ export function computeACFromSampling(
 }
 
 /**
+ * Computes relative adjustment factors (ca) and adjusts contextual values: V^CR = V^C * ca.
+ *
+ * Mathematical Formulation:
+ * 1. By reference characteristic (byPop):
+ *    ca_i = 1 / V^C_{pop, i} (if V^C_{pop, i} > 0, else 0).
+ * 2. By elapsed minutes vs total match time:
+ *    ca_i = duration / totalDuration (default 90).
+ * 3. By relative interaction/touches:
+ *    ca_i = avgTouches / touches_i.
+ * 4. By mean contextual value:
+ *    ca_i = 1 / mean(V^C).
+ * 5. Custom mathematical expression:
+ *    f(m, minutos, T, minutos_totales, toques, media_toques, vc, media_vc, i).
+ * 6. None:
+ *    ca_i = 1.0.
+ */
+export const computeRelativeAdjustment = (
+  VC: number[],
+  options?: RelativeAdjustmentOptions
+): { ca: number[]; VCR: number[] } => {
+  const n = VC.length;
+  const ca: number[] = Array(n).fill(1.0);
+  const type = options?.type || (options?.byPop !== undefined && options.byPop !== -1 ? 'byPop' : 'none');
+
+  if (type === 'byPop' && options?.populationVC) {
+    const pop = options.populationVC;
+    for (let i = 0; i < n; i++) {
+      ca[i] = pop[i] && pop[i] > 0 ? 1 / pop[i] : 0;
+    }
+  } else if (type === 'byMinutes') {
+    const dur = options?.duration ?? 90;
+    const total = options?.totalDuration ?? 90;
+    const factor = total > 0 ? dur / total : 1.0;
+    for (let i = 0; i < n; i++) ca[i] = factor;
+  } else if (type === 'byTouches') {
+    const touches = options?.touches || Array(n).fill(1);
+    const avgTouches = touches.reduce((a, b) => a + b, 0) / (n || 1);
+    for (let i = 0; i < n; i++) {
+      ca[i] = touches[i] > 0 ? avgTouches / touches[i] : 1.0;
+    }
+  } else if (type === 'byMean') {
+    const mean = options?.meanVC ?? (VC.reduce((a, b) => a + b, 0) / (n || 1));
+    const factor = mean > 0 ? 1 / mean : 1.0;
+    for (let i = 0; i < n; i++) ca[i] = factor;
+  } else if (type === 'custom' && options?.customExpr) {
+    const touches = options?.touches || Array(n).fill(1);
+    const avgTouches = touches.reduce((a, b) => a + b, 0) / (n || 1);
+    const mean = options?.meanVC ?? (VC.reduce((a, b) => a + b, 0) / (n || 1));
+    const dur = options?.duration ?? 90;
+    const total = options?.totalDuration ?? 90;
+
+    for (let i = 0; i < n; i++) {
+      const scope = {
+        m: dur,
+        minutos: dur,
+        T: total,
+        minutos_totales: total,
+        toques: touches[i],
+        media_toques: avgTouches,
+        vc: VC[i],
+        media_vc: mean,
+        i,
+        ...options?.extraScope
+      };
+      const res = evaluateMathExpression(options.customExpr, scope, 1.0);
+      ca[i] = Math.max(0, Number.isFinite(res) ? res : 1.0);
+    }
+  }
+
+  const VCR = VC.map((v, i) => v * ca[i]);
+  return { ca, VCR };
+};
+
+/**
+ * Computes equalization / scale normalization on a 1D vector of values to [0, 1].
+ *
+ * Supported methods:
+ * - 'max' | 'maximum': v_i / max(V)
+ * - 'sum': v_i / sum(V)
+ * - 'target': min(1, max(0, v_i / targetObj))
+ * - 'custom': user-defined mathematical function f(vp, max_vp, sum_vp, i)
+ * - 'none': keeps raw values unchanged
+ */
+export const computeEqualizationVector = (
+  values: number[],
+  options?: EqualizationOptions
+): { equalized: number[]; factor: number } => {
+  const n = values.length;
+  if (n === 0) return { equalized: [], factor: 1 };
+
+  const type = options?.type || 'max';
+  const precision = options?.precision ?? 4;
+
+  if (type === 'none') {
+    return { equalized: [...values], factor: 1 };
+  }
+
+  if (type === 'max' || type === 'maximum') {
+    let maxVal = 0;
+    for (let i = 0; i < n; i++) {
+      if (values[i] > maxVal) maxVal = values[i];
+    }
+    const factor = maxVal > 0 ? 1 / maxVal : 1;
+    const equalized = values.map(v =>
+      maxVal > 0 ? Number((v / maxVal).toFixed(precision)) : 0
+    );
+    return { equalized, factor };
+  }
+
+  if (type === 'sum') {
+    let sumVal = 0;
+    for (let i = 0; i < n; i++) sumVal += values[i];
+    const factor = sumVal > 0 ? 1 / sumVal : 1;
+    const equalized = values.map(v =>
+      sumVal > 0 ? Number((v / sumVal).toFixed(precision)) : 0
+    );
+    return { equalized, factor };
+  }
+
+  if (type === 'target') {
+    const obj = options?.obj && options.obj > 0 ? options.obj : 1;
+    const factor = 1 / obj;
+    const equalized = values.map(v =>
+      Number(Math.min(1, Math.max(0, v * factor)).toFixed(precision))
+    );
+    return { equalized, factor };
+  }
+
+  if (type === 'custom') {
+    let maxVal = 0;
+    let sumVal = 0;
+    for (let i = 0; i < n; i++) {
+      if (values[i] > maxVal) maxVal = values[i];
+      sumVal += values[i];
+    }
+    const expr = options?.customExpr || 'vp / max_vp';
+    const equalized = values.map((v, i) => {
+      const scope = {
+        vp: v,
+        vc: v,
+        v,
+        max_vp: maxVal || 1,
+        max_vc: maxVal || 1,
+        max: maxVal || 1,
+        sum_vp: sumVal || 1,
+        sum_vc: sumVal || 1,
+        sum: sumVal || 1,
+        i
+      };
+      const res = evaluateMathExpression(expr, scope, v);
+      return Math.max(0, Number.isFinite(res) ? Number(res.toFixed(precision)) : v);
+    });
+    return { equalized, factor: 1 };
+  }
+
+  return { equalized: [...values], factor: 1 };
+};
+
+/**
+ * Computes equalization across a 2D matrix (n alternatives x m criteria).
+ * Equalizes each criterion column j according to its equalization configuration.
+ */
+export const computeEqualizationMatrix = (
+  matrix: number[][],
+  configs?: EqualizationOptions | EqualizationOptions[]
+): number[][] => {
+  const n = matrix.length;
+  if (n === 0) return [];
+  const m = matrix[0]?.length || 0;
+  if (m === 0) return Array.from({ length: n }, () => []);
+
+  const equalizedCols: number[][] = [];
+  for (let j = 0; j < m; j++) {
+    const colValues = matrix.map(row => row[j] ?? 0);
+    const cfg = Array.isArray(configs) ? configs[j] : configs;
+    const { equalized } = computeEqualizationVector(colValues, cfg);
+    equalizedCols.push(equalized);
+  }
+
+  return Array.from({ length: n }, (_, i) =>
+    Array.from({ length: m }, (_, j) => equalizedCols[j][i])
+  );
+};
+
+/**
  * Computes relative population adjustments (ca), relative contextual values (V^CR),
  * scale normalization factor (cn), and final equiparated values (V^CRN).
- * 
- * Mathematical Formulation:
- * 1. Relative Population Adjustment:
- *    - If a population reference characteristic is chosen (adj.byPop !== -1):
- *      ca_i = 1 / V^C_{pop, i} (if V^C_{pop, i} > 0, else 0).
- *    - Otherwise, ca_i = 1 (no relative scaling).
- *    - Relative Contextual Value: V^CR_i = V^C_i * ca_i.
- * 
- * 2. Equalization / Normalization (cn):
- *    - If normType is 'target' and obj > 0:
- *      cn = 1 / obj
- *    - If normType is 'maximum':
- *      cn = 1 / max(V^CR_i, 1e-9)
- * 
- * 3. Equiparated Contextual Value:
- *    - V^CRN_i = min(1, max(0, V^CR_i * cn))
- *    Guarantees that criterion evaluations are bounded in [0, 1] for subsequent OWA aggregation.
  */
 export const computeCharacteristicAdjustment = (
   char: Characteristic,
   VC: number[],
   allVCs: number[][]
 ): { ca: number[]; VCR: number[]; cn: number; VCRN: number[] } => {
-  const n = VC.length;
-  let ca = Array(n).fill(1);
+  const popVC = char.adj.byPop !== -1 && allVCs[char.adj.byPop] ? allVCs[char.adj.byPop] : undefined;
+  const { ca, VCR } = computeRelativeAdjustment(VC, {
+    type: 'byPop',
+    byPop: char.adj.byPop,
+    populationVC: popVC
+  });
 
-  // Apply population weighting if a reference characteristic is specified
-  if (char.adj.byPop !== -1 && allVCs[char.adj.byPop]) {
-    const populationContextualValues = allVCs[char.adj.byPop];
-    ca = populationContextualValues.map(p => (p > 0 ? 1 / p : 0));
-  }
-
-  // Multiply by relative adjustment coefficient
-  const VCR = VC.map((vc, i) => vc * ca[i]);
-
-  // Compute scale normalization factor
-  let cn = 1;
-  let VCRN: number[];
-  if (char.adj.normType === 'none') {
-    cn = 1;
-    // None: keep values as-is without applying equalization
-    VCRN = [...VCR];
-  } else if (char.adj.normType === 'target' && char.adj.obj > 0) {
-    cn = 1 / char.adj.obj;
-    VCRN = VCR.map(v => Math.min(1, Math.max(0, v * cn)));
-  } else {
-    // 'maximum' (default)
-    const maxVCR = Math.max(...VCR, 1e-9);
-    cn = 1 / maxVCR;
-    VCRN = VCR.map(v => Math.min(1, Math.max(0, v * cn)));
-  }
+  const { equalized: VCRN, factor: cn } = computeEqualizationVector(VCR, {
+    type: char.adj.normType,
+    obj: char.adj.obj,
+    customExpr: char.adj.customExpr
+  });
 
   return { ca, VCR, cn, VCRN };
 };

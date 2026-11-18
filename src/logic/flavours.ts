@@ -28,16 +28,34 @@ export interface FlavourDefinition {
 }
 
 /**
+ * Optional snapshot of the complete soccer MVP model configuration for JSON export/import.
+ */
+export interface SoccerFlavourModelConfig {
+  activeSoccerTab?: 'segments' | 'integral';
+  selectedSegmentId?: string;
+  propagationConfig?: any;
+  blockingConfig?: any;
+  synergyConfig?: any;
+  relativeConfig?: any;
+  equalizationConfig?: any;
+  dimensionOverrides?: Record<string, any>;
+  owaConfig?: any;
+  dimAffinityMatrix?: number[][];
+}
+
+/**
  * Serializable case container stored and exchanged by each flavour page.
  */
 export interface FlavourAnalysisCase {
   version: string;
   flavour: FlavourId;
+  description?: string; // Optional user description of the analysis / match case
   sourceUrl: string;
   matchDataJson?: string;
   updatedAt: string;
   exportedAt?: string;
   dataset?: OrdomaticaDataset;
+  soccerModelConfig?: SoccerFlavourModelConfig;
 }
 
 /**

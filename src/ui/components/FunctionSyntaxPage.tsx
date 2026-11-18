@@ -17,13 +17,19 @@ import { AppFooter } from './AppFooter';
 import { evaluateMathExpression } from '../../logic/mathExpression';
 import { useI18n } from '../i18n/I18nContext';
 
-export const FunctionSyntaxPage: React.FC = () => {
+export interface FunctionSyntaxPageProps {
+  isSidebarOpen?: boolean;
+}
+
+export const FunctionSyntaxPage: React.FC<FunctionSyntaxPageProps> = ({ isSidebarOpen = true }) => {
   const { language } = useI18n();
   const isEs = language === 'es';
 
   // Interactive formula tester state
   const [testExpr, setTestExpr] = useState<string>('max(0, 1 - (d / L))');
-  const [testVariables, setTestVariables] = useState<string>('d = 4, L = 10, a = 0.75, S = 2.5, vb = 0.3, k = 1.2, vc = 3.5, pop = 10, vcr = 0.35, max_vcr = 0.5');
+  const [testVariables, setTestVariables] = useState<string>(
+    'd = 4, L = 10, L1 = 3, a = 0.75, S = 2.5, vb = 0.3, k = 1.2, theta = 0.25, vc = 3.5, pop = 10, vcr = 0.35, max_vcr = 0.5, obj = 1, minutos = 45, minutos_totales = 90, toques = 30, media_toques = 25, media_vc = 2.5, vp = 3.5, max_vp = 7, sum_vp = 20'
+  );
 
   // Parse variables and evaluate test expression
   const evalResult = useMemo(() => {
@@ -50,77 +56,98 @@ export const FunctionSyntaxPage: React.FC = () => {
 
   const formulasList = [
     {
-      category: isEs ? 'Propagación de Afinidad (F_P)' : 'Affinity Propagation (F_P)',
+      category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Triangular' : 'Triangular Propagation',
       math: 'a_{ij} = \\max\\left(0, 1 - \\frac{d_{ij}}{L}\\right)',
       syntax: 'max(0, 1 - (d / L))',
       desc: isEs ? 'Decaimiento lineal continuo hasta anularse a partir de la distancia límite L.' : 'Linear decay down to zero starting from limit distance L.'
     },
     {
-      category: isEs ? 'Propagación de Afinidad (F_P)' : 'Affinity Propagation (F_P)',
+      category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Rectangular' : 'Rectangular Propagation',
       math: 'a_{ij} = 1 \\text{ si } d_{ij} \\le L, \\; 0 \\text{ si } d_{ij} > L',
       syntax: 'd <= L ? 1 : 0',
       desc: isEs ? 'Función escalón o compuerta booleana de alcance estricto.' : 'Step gate function with strict threshold range.'
     },
     {
-      category: isEs ? 'Propagación de Afinidad (F_P)' : 'Affinity Propagation (F_P)',
+      category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Trapezoidal' : 'Trapezoidal Propagation',
       math: 'd \\le L_1 \\Rightarrow 1; \\; d \\ge L \\Rightarrow 0; \\; \\text{resto} \\Rightarrow \\frac{L - d}{L - L_1}',
       syntax: 'd <= L1 ? 1 : (d >= L ? 0 : (L - d) / (L - L1))',
       desc: isEs ? 'Meseta constante hasta el límite L1 y decaimiento lineal posterior hasta L.' : 'Constant plateau up to limit L1 followed by linear decay to L.'
     },
     {
-      category: isEs ? 'Propagación de Afinidad (F_P)' : 'Affinity Propagation (F_P)',
+      category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Sinusoidal' : 'Sinusoidal Propagation',
-      math: 'a_{ij} = \\sin\\left(\\frac{\\pi d_{ij}}{2 L}\\right)',
-      syntax: 'sin(pi * d / (2 * L))',
-      desc: isEs ? 'Modulación suave no lineal armónica con tangencia cero en los extremos.' : 'Harmonic non-linear smooth modulation.'
+      math: 'a_{ij} = \\frac{1}{2}\\left(1 + \\cos\\left(\\frac{\\pi d_{ij}}{L}\\right)\\right)',
+      syntax: 'd <= L ? 0.5 * (1 + cos(pi * d / L)) : 0',
+      desc: isEs ? 'Modulación suave no lineal armónica con tangencia cero en los extremos (a=1 en d=0, a=0 en d=L).' : 'Smooth harmonic non-linear modulation with zero tangency at endpoints (a=1 at d=0, a=0 at d=L).'
     },
     {
-      category: isEs ? 'Propagación de Afinidad (F_P)' : 'Affinity Propagation (F_P)',
+      category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Inhibida' : 'Inhibited Propagation',
+      math: 'a_{ij} = 0 \\quad (i \\neq j)',
+      syntax: '0',
+      desc: isEs ? 'Anula la afinidad propagada entre elementos distintos (mantiene únicamente a_ii = 1).' : 'Nullifies propagated affinity between distinct elements (preserves strictly a_ii = 1).'
+    },
+    {
+      category: isEs ? 'Propagación' : 'Propagation',
+      name: isEs ? 'Propagación Gaussiana (Personalizada)' : 'Gaussian Propagation (Custom Example)',
       math: 'a_{ij} = \\exp\\left(-\\left(\\frac{d_{ij}}{L}\\right)^2\\right)',
       syntax: 'exp(- (d / L)^2)',
-      desc: isEs ? 'Decaimiento gaussiano exponencial acentuado para transiciones de corto alcance.' : 'Steep Gaussian exponential decay for localized interactions.'
+      desc: isEs ? 'Decaimiento gaussiano exponencial suave acentuado para transiciones de corto alcance.' : 'Steep smooth Gaussian exponential decay for localized interactions.'
     },
     {
-      category: isEs ? 'Bloqueo Autoinducido (F_B)' : 'Autoinduced Blocking (F_B)',
+      category: isEs ? 'Bloqueo' : 'Blocking',
       name: isEs ? 'Bloqueo Standard (Tesis)' : 'Standard Blocking (Thesis)',
       math: 'i = j \\Rightarrow \\left(\\frac{1}{\\sum_k a_{ik}}\\right)^{1 - v_i^b}; \\; i \\neq j \\Rightarrow \\frac{a_{ij}}{\\sum_k a_{ik} - 1}\\left(1 - \\left(\\frac{1}{\\sum_k a_{ik}}\\right)^{1 - v_i^b}\\right)',
       syntax: 'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))',
       desc: isEs ? 'Formulación canónica de autoinducción que preserva analíticamente la conservación unitaria de fila.' : 'Canonical autoinduction formulation analytically preserving unit row sum conservation.'
     },
     {
-      category: isEs ? 'Sinergia Colectiva (F_S)' : 'Collective Synergy (F_S)',
+      category: isEs ? 'Bloqueo' : 'Blocking',
+      name: isEs ? 'Bloqueo por Umbral' : 'Threshold Blocking',
+      math: 'a_{ij} < \\theta \\Rightarrow 0; \\; a_{ij} \\ge \\theta \\Rightarrow a_{ij}',
+      syntax: 'a < theta ? 0 : a',
+      desc: isEs ? 'Filtra y anula las afinidades débiles por debajo del umbral theta seleccionado.' : 'Filters and nullifies weak affinities below the selected threshold theta.'
+    },
+    {
+      category: isEs ? 'Sinergia' : 'Synergy',
+      name: isEs ? 'Sin Sinergia (Identidad)' : 'No Synergy (Identity)',
+      math: 'a^C_{ij} = a_{ij}',
+      syntax: 'a',
+      desc: isEs ? 'Mantiene inalteradas las afinidades autoinducidas entre distintas alternativas.' : 'Keeps autoinduced affinities unchanged between different alternatives.'
+    },
+    {
+      category: isEs ? 'Sinergia' : 'Synergy',
       name: isEs ? 'Sinergia por Factor' : 'Factor Synergy',
-      math: 'a^C_{ij} = \\min(1, a_{ij} \\cdot k)',
-      syntax: 'min(1, a * k)',
+      math: 'a^C_{ij} = a_{ij} \\cdot k',
+      syntax: 'a * k',
       desc: isEs ? 'Modula multiplicativamente la afinidad autoinducida según el factor k.' : 'Multiplicatively modulates autoinduced affinity by factor k.'
     },
     {
-      category: isEs ? 'Ajuste Relativo (c_a)' : 'Relative Adjustment (c_a)',
+      category: isEs ? 'Ajuste Relativo' : 'Relative Adjustment',
       name: isEs ? 'Ajuste Relativo por Dimensión de Contraste' : 'Relative Contrast Dimension Adjustment',
       math: 'V^{CR}_i = V^C_i \\cdot \\frac{1}{V_{pop, i}}',
       syntax: 'vc / pop',
       desc: isEs ? 'Pondera el valor contextual de cada alternativa en función de su contraste relativo respecto a una dimensión de ajuste o población.' : 'Weights contextual value of each alternative relative to an adjustment or population dimension.'
     },
     {
-      category: isEs ? 'Equiparación Interdimensional (c_n)' : 'Equalization Adjustment (c_n)',
+      category: isEs ? 'Equiparación Interdimensional' : 'Equalization Adjustment',
       name: isEs ? 'Sin Equiparación (Ninguno)' : 'No Equalization (None)',
       math: 'V^{CRN}_{i} = V^{CR}_{i}',
       syntax: 'vcr',
       desc: isEs ? 'Mantiene los valores relativos tal cual están sin aplicar ningún factor de escala de equiparación (c_n = 1).' : 'Maintains relative values as-is without applying any equalization scaling factor (c_n = 1).'
     },
     {
-      category: isEs ? 'Equiparación Interdimensional (c_n)' : 'Equalization Adjustment (c_n)',
+      category: isEs ? 'Equiparación Interdimensional' : 'Equalization Adjustment',
       name: isEs ? 'Equiparación por Máximo' : 'Maximum Equalization',
       math: 'V^{CRN}_{i} = \\min\\left(1, \\frac{V^{CR}_{i}}{\\max_k V^{CR}_{k}}\\right)',
       syntax: 'min(1, vcr / max_vcr)',
       desc: isEs ? 'Escala los valores relativos al intervalo [0, 1] dividiendo entre el valor máximo observado en la dimensión.' : 'Scales relative values to [0, 1] dividing by the maximum value observed in the dimension.'
     },
     {
-      category: isEs ? 'Equiparación Interdimensional (c_n)' : 'Equalization Adjustment (c_n)',
+      category: isEs ? 'Equiparación Interdimensional' : 'Equalization Adjustment',
       name: isEs ? 'Equiparación por Objetivo' : 'Target Objective Equalization',
       math: 'V^{CRN}_{i} = \\min\\left(1, \\frac{V^{CR}_{i}}{obj}\\right)',
       syntax: 'min(1, vcr / obj)',
@@ -129,8 +156,20 @@ export const FunctionSyntaxPage: React.FC = () => {
   ];
 
   return (
-    <div className="animate-in fade-in duration-300 max-w-6xl mx-auto space-y-8 pb-12">
-      {/* Header Banner */}
+    <div className="flex-1 flex overflow-hidden relative w-full h-full">
+      {/* LEFT SIDEBAR FOR FUNCTION SYNTAX */}
+      <aside
+        className={`transition-all duration-300 ease-in-out border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0 hidden md:flex flex-col justify-start overflow-y-auto ${
+          isSidebarOpen ? 'w-72 lg:w-80 p-5' : 'w-0 p-0 overflow-hidden border-r-0 opacity-0 pointer-events-none'
+        }`}
+      >
+        <AppFooter variant="sidebar" />
+      </aside>
+
+      {/* RIGHT MAIN SCROLLABLE CONTAINER */}
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50 dark:bg-gray-950 transition-colors duration-200 scroll-smooth">
+        <div className="max-w-[1360px] mx-auto space-y-8 pb-16 animate-in fade-in duration-300">
+          {/* Header Banner */}
       <div className="rounded-2xl p-6 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-purple-900/30 border border-blue-500/30 shadow-sm relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
@@ -243,7 +282,7 @@ export const FunctionSyntaxPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             <span className="font-bold text-gray-900 dark:text-gray-100">
-              {isEs ? 'Glosario de Variables y Términos del Modelo Ordomático' : 'Glossary of Ordomatics Model Variables & Terms'}
+              {isEs ? 'Glosario de Variables y Términos' : 'Glossary of Variables & Terms'}
             </span>
           </div>
         }
@@ -259,8 +298,7 @@ export const FunctionSyntaxPage: React.FC = () => {
             {/* Box 1: Propagación */}
             <div className="p-4 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/60 space-y-2">
               <div className="font-bold text-purple-700 dark:text-purple-300 text-xs flex items-center justify-between">
-                <span>{isEs ? 'Función de Propagación' : 'Propagation Function'} (F_P)</span>
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50">D &rarr; A</span>
+                <span>{isEs ? 'Función de Propagación' : 'Propagation Function'}</span>
               </div>
               <ul className="space-y-1.5 text-[11px] text-gray-700 dark:text-gray-300">
                 <li><code className="font-bold text-purple-600 dark:text-purple-400">d</code> o <code className="font-bold text-purple-600 dark:text-purple-400">dist</code>: {isEs ? 'Distancia observada entre las alternativas i y j.' : 'Observed distance between alternatives i and j.'}</li>
@@ -272,8 +310,7 @@ export const FunctionSyntaxPage: React.FC = () => {
             {/* Box 2: Bloqueo */}
             <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 space-y-2">
               <div className="font-bold text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between">
-                <span>{isEs ? 'Función de Bloqueo' : 'Blocking Function'} (F_B)</span>
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50">A &rarr; A^AI</span>
+                <span>{isEs ? 'Función de Bloqueo' : 'Blocking Function'}</span>
               </div>
               <ul className="space-y-1.5 text-[11px] text-gray-700 dark:text-gray-300">
                 <li><code className="font-bold text-amber-600 dark:text-amber-400">a</code>: {isEs ? 'Valor de afinidad propagada a_ij previo.' : 'Previous propagated affinity a_ij.'}</li>
@@ -287,8 +324,7 @@ export const FunctionSyntaxPage: React.FC = () => {
             {/* Box 3: Sinergia */}
             <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/60 space-y-2">
               <div className="font-bold text-blue-700 dark:text-blue-300 text-xs flex items-center justify-between">
-                <span>{isEs ? 'Función de Sinergia' : 'Synergy Function'} (F_S)</span>
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50">A^AA &rarr; A^C</span>
+                <span>{isEs ? 'Función de Sinergia' : 'Synergy Function'}</span>
               </div>
               <ul className="space-y-1.5 text-[11px] text-gray-700 dark:text-gray-300">
                 <li><code className="font-bold text-blue-600 dark:text-blue-400">a</code>: {isEs ? 'Afinidad autoconvectiva previa de la celda a^AA_ij.' : 'Previous autoconvective affinity a^AA_ij.'}</li>
@@ -299,8 +335,7 @@ export const FunctionSyntaxPage: React.FC = () => {
             {/* Box 4: Ajuste Relativo */}
             <div className="p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/60 space-y-2">
               <div className="font-bold text-indigo-700 dark:text-indigo-300 text-xs flex items-center justify-between">
-                <span>{isEs ? 'Ajuste Relativo' : 'Relative Adjustment'} (c_a)</span>
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/50">V^C &rarr; V^CR</span>
+                <span>{isEs ? 'Ajuste Relativo' : 'Relative Adjustment'}</span>
               </div>
               <ul className="space-y-1.5 text-[11px] text-gray-700 dark:text-gray-300">
                 <li><code className="font-bold text-indigo-600 dark:text-indigo-400">vp</code>, <code className="font-bold text-indigo-600 dark:text-indigo-400">vc</code>: {isEs ? 'Valor propio o contextual de la alternativa.' : 'Own or contextual value of the alternative.'}</li>
@@ -312,8 +347,7 @@ export const FunctionSyntaxPage: React.FC = () => {
             {/* Box 5: Equiparación */}
             <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 space-y-2">
               <div className="font-bold text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
-                <span>{isEs ? 'Ajuste por Equiparación' : 'Equalization Adjustment'} (c_n)</span>
-                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50">V^CR &rarr; V^CRN</span>
+                <span>{isEs ? 'Ajuste por Equiparación' : 'Equalization Adjustment'}</span>
               </div>
               <ul className="space-y-1.5 text-[11px] text-gray-700 dark:text-gray-300">
                 <li><code className="font-bold text-emerald-600 dark:text-emerald-400">vcr</code>: {isEs ? 'Valor relativo previo de la alternativa en la dimensión.' : 'Previous relative value of the alternative in dimension.'}</li>
@@ -327,7 +361,6 @@ export const FunctionSyntaxPage: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 space-y-2">
               <div className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center justify-between">
                 <span>{isEs ? 'Matrices del Modelo' : 'Model Matrices'}</span>
-                <Layers className="w-4 h-4 text-slate-500" />
               </div>
               <ul className="space-y-1.5 text-[11px] text-gray-700 dark:text-gray-300 font-mono">
                 <li><strong className="text-amber-600 dark:text-amber-400">D</strong>: {isEs ? 'Matriz de distancias o costes entre alternativas' : 'Distance or cost matrix between alternatives'}</li>
@@ -347,7 +380,7 @@ export const FunctionSyntaxPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <Calculator className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             <span className="font-bold text-gray-900 dark:text-gray-100">
-              {isEs ? 'Funciones Definidas' : 'Defined Functions'}
+              {isEs ? 'Catálogo de Funciones' : 'Functions Catalog'}
             </span>
           </div>
         }
@@ -356,7 +389,7 @@ export const FunctionSyntaxPage: React.FC = () => {
           <table className="w-full text-xs text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 font-semibold text-gray-600 dark:text-gray-300">
-                <th className="py-2.5 px-3">{isEs ? 'Función / Módulo' : 'Function / Module'}</th>
+                <th className="py-2.5 px-3">{isEs ? 'Función' : 'Function'}</th>
                 <th className="py-2.5 px-3">{isEs ? 'Nombre de Opción' : 'Option Name'}</th>
                 <th className="py-2.5 px-3">{isEs ? 'Sintaxis Escrita (Math.js)' : 'Written Syntax (Math.js)'}</th>
                 <th className="py-2.5 px-3">{isEs ? 'Descripción del Comportamiento' : 'Behavior Description'}</th>
@@ -464,8 +497,10 @@ export const FunctionSyntaxPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* Persistent Author & License Footer */}
-      <AppFooter />
-    </div>
+        {/* Persistent Author & License Footer */}
+        <AppFooter />
+      </div>
+    </main>
+  </div>
   );
 };

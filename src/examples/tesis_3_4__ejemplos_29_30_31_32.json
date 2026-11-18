@@ -1,0 +1,1166 @@
+{
+  "version": "2.0.0",
+  "exportedAt": "2026-11-18T00:18:16.932Z",
+  "dataset": {
+    "description": "Ejemplos 29, 30, 31 y 32 del 3.4 Modelo de Agregación de la Tesis \"La Sonrisa de Mona Lisa: Una Introducción a la Ordomática\"",
+    "elements": [
+      "A",
+      "B",
+      "C"
+    ],
+    "elementImages": [
+      "",
+      "",
+      ""
+    ],
+    "decimalPrecision": 2,
+    "dimensions": [
+      {
+        "id": 1794957925937,
+        "name": "D1",
+        "type": "quantitative",
+        "min": 40,
+        "max": 140,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "100",
+          "140",
+          "40"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "blockingVector": [
+          0,
+          0,
+          0
+        ],
+        "vb": [
+          0,
+          0,
+          0
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc",
+        "affinityEntryStage": "ac",
+        "customContextualAffinityMatrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "customAC": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "id": 1794957926402,
+        "name": "D2",
+        "type": "quantitative",
+        "min": 10,
+        "max": 110,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "110",
+          "10",
+          "30"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "blockingVector": [
+          0,
+          0,
+          0
+        ],
+        "vb": [
+          0,
+          0,
+          0
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc",
+        "affinityEntryStage": "ac",
+        "customContextualAffinityMatrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "customAC": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "id": 1794957926724,
+        "name": "D3",
+        "type": "quantitative",
+        "min": 10,
+        "max": 130,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "130",
+          "60",
+          "10"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "blockingVector": [
+          0,
+          0,
+          0
+        ],
+        "vb": [
+          0,
+          0,
+          0
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc",
+        "affinityEntryStage": "ac",
+        "customContextualAffinityMatrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "customAC": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "id": 1794957927117,
+        "name": "D4",
+        "type": "quantitative",
+        "min": 40,
+        "max": 100,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "40",
+          "100",
+          "70"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "blockingVector": [
+          0,
+          0,
+          0
+        ],
+        "vb": [
+          0,
+          0,
+          0
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc",
+        "affinityEntryStage": "ac",
+        "customContextualAffinityMatrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "customAC": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    ],
+    "characteristics": [
+      {
+        "id": 1794957925937,
+        "name": "D1",
+        "type": "quantitative",
+        "min": 40,
+        "max": 140,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "100",
+          "140",
+          "40"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "blockingVector": [
+          0,
+          0,
+          0
+        ],
+        "vb": [
+          0,
+          0,
+          0
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc",
+        "affinityEntryStage": "ac",
+        "customContextualAffinityMatrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "customAC": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "id": 1794957926402,
+        "name": "D2",
+        "type": "quantitative",
+        "min": 10,
+        "max": 110,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "110",
+          "10",
+          "30"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "blockingVector": [
+          0,
+          0,
+          0
+        ],
+        "vb": [
+          0,
+          0,
+          0
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc",
+        "affinityEntryStage": "ac",
+        "customContextualAffinityMatrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "customAC": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "id": 1794957926724,
+        "name": "D3",
+        "type": "quantitative",
+        "min": 10,
+        "max": 130,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "130",
+          "60",
+          "10"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "blockingVector": [
+          0,
+          0,
+          0
+        ],
+        "vb": [
+          0,
+          0,
+          0
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc",
+        "affinityEntryStage": "ac",
+        "customContextualAffinityMatrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "customAC": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "id": 1794957927117,
+        "name": "D4",
+        "type": "quantitative",
+        "min": 40,
+        "max": 100,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "40",
+          "100",
+          "70"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            null,
+            null
+          ],
+          [
+            null,
+            0,
+            null
+          ],
+          [
+            null,
+            null,
+            0
+          ]
+        ],
+        "blockingVector": [
+          0,
+          0,
+          0
+        ],
+        "vb": [
+          0,
+          0,
+          0
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc",
+        "affinityEntryStage": "ac",
+        "customContextualAffinityMatrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "customAC": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    ],
+    "criteriaCorrelationMatrix": [
+      [
+        1,
+        0.3,
+        0.8,
+        0
+      ],
+      [
+        0.3,
+        1,
+        0.5,
+        0
+      ],
+      [
+        0.8,
+        0.5,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "cMatrix": [
+      [
+        1,
+        0.3,
+        0.8,
+        0
+      ],
+      [
+        0.3,
+        1,
+        0.5,
+        0
+      ],
+      [
+        0.8,
+        0.5,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "orderedWeightedAveragingWeights": [
+      1,
+      0.9,
+      0.8,
+      0.7
+    ],
+    "owa": [
+      1,
+      0.9,
+      0.8,
+      0.7
+    ]
+  }
+}

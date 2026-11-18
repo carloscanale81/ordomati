@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { Card } from './Card';
 import { SoccerIntegralAffinityPanel } from './SoccerIntegralAffinityPanel';
+import { SoccerIntegralPlayerCard } from './SoccerIntegralPlayerCard';
+import { ErrorBoundary } from './ErrorBoundary';
 import {
   SoccerTimelineResult,
   SoccerConcept,
@@ -53,15 +55,49 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
 }) => {
   const { t } = useI18n();
 
-  const totalMinutes = timeline.totalMinutes || 120;
+  const totalMinutes = timeline.totalMinutes || 90;
   const [sliderMinute, setSliderMinute] = useState<number>(totalMinutes);
   const [selectedConceptOrAgg, setSelectedConceptOrAgg] = useState<SoccerConcept | 'aggregate'>(
     'aggregate'
   );
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [selectedAffinityTeam, setSelectedAffinityTeam] = useState<'home' | 'away'>('home');
+  const [expandedPlayerKeys, setExpandedPlayerKeys] = useState<Set<number | string>>(new Set());
+  const [playerSegmentSelection, setPlayerSegmentSelection] = useState<Record<number | string, string | null>>({});
 
-  // Compute cumulative scores for all players up to sliderMinute
+  // Synchronize slider minute when match or totalMinutes changes
+  React.useEffect(() => {
+    setSliderMinute(totalMinutes);
+    setIsPlaying(false);
+  }, [totalMinutes]);
+
+  const allEvents = useMemo(
+    () => [...(timeline.homeEvents || []), ...(timeline.awayEvents || [])],
+    [timeline.homeEvents, timeline.awayEvents]
+  );
+
+  const toggleExpandPlayer = (key: number | string) => {
+    setExpandedPlayerKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const selectPlayerSegment = (key: number | string, segmentId: string | null) => {
+    setPlayerSegmentSelection(prev => ({
+      ...prev,
+      [key]: segmentId
+    }));
+  };
+
+  const effectiveSliderMinute = Math.min(sliderMinute, totalMinutes);
+
+  // Compute cumulative scores for all players up to effectiveSliderMinute
   const analysisResult: IntegralMatchAnalysisResult = useMemo(() => {
     return computeIntegralMatchCumulativeScores(
       timeline,
@@ -70,7 +106,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
       owaConfig,
       dimAffinityMatrix,
       synergyConfigs,
-      sliderMinute,
+      effectiveSliderMinute,
       propagationConfig,
       blockingConfig,
       relativeConfig,
@@ -83,14 +119,14 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
     owaConfig,
     dimAffinityMatrix,
     synergyConfigs,
-    sliderMinute,
+    effectiveSliderMinute,
     propagationConfig,
     blockingConfig,
     relativeConfig,
     equalizationConfig
   ]);
 
-  // Compute cumulative contextual affinity and distance matrix up to sliderMinute
+  // Compute cumulative contextual affinity and distance matrix up to effectiveSliderMinute
   const activeSynergyConfig =
     selectedConceptOrAgg === 'aggregate'
       ? synergyConfigs['dribblesWon'] || { type: 'factor', k: 1.0 }
@@ -102,7 +138,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
       matchData,
       selectedAffinityTeam,
       activeSynergyConfig,
-      sliderMinute,
+      effectiveSliderMinute,
       propagationConfig,
       blockingConfig
     );
@@ -111,7 +147,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
     matchData,
     selectedAffinityTeam,
     activeSynergyConfig,
-    sliderMinute,
+    effectiveSliderMinute,
     propagationConfig,
     blockingConfig
   ]);
@@ -163,15 +199,17 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
   // Human label for key moments at convergent cut points
   const getCutPointLabel = (minute: number): string => {
     if (minute === 0) return t('soccer.integral.eventStart');
-    if (minute === 18) return '⚽ Gol Messi (ARG)';
-    if (minute === 34) return '⚽ Gol Olmo (ESP)';
     if (minute === 45) return t('soccer.integral.eventHalfTime');
-    if (minute === 57) return '⚽ Gol Mac Allister (ARG)';
-    if (minute === 79) return '⚽ Gol Yamal (ESP)';
-    if (minute === 90) return t('soccer.integral.eventFullTime');
-    if (minute === 105) return t('soccer.integral.eventExtraHalf');
-    if (minute === 108) return '⚽ Gol Rodri (ESP)';
-    if (minute === 120) return t('soccer.integral.eventMatchEnd');
+    if (minute === totalMinutes) return t('soccer.integral.eventMatchEnd');
+    if (totalMinutes > 90 && minute === 90) return t('soccer.integral.eventFullTime');
+    if (totalMinutes > 90 && minute === 105) return t('soccer.integral.eventExtraHalf');
+
+    const ev = allEvents.find(e => e.minute === minute);
+    if (ev) {
+      if (ev.type === 'goal') return `⚽ ${ev.description}`;
+      if (ev.type === 'red_card') return `🟥 ${ev.description}`;
+      if (ev.type === 'sub') return `⇄ ${ev.description}`;
+    }
     return `${minute}'`;
   };
 
@@ -334,7 +372,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
                   <div
                     key={cutMinute}
                     style={{ width: `${widthPercent}%` }}
-                    className={`h-full border-r border-white/40 dark:border-gray-900/40 transition-colors relative flex items-center justify-center ${
+                    className={`h-full border-r border-white/40 dark:border-gray-900/40 transition-colors relative flex items-center justify-center min-w-0 flex-shrink-0 ${
                       isPassed
                         ? 'bg-gradient-to-r from-indigo-500 to-indigo-600'
                         : isCurrent
@@ -342,7 +380,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
                         : 'bg-gray-100 dark:bg-gray-800/80 hover:bg-gray-200 dark:hover:bg-gray-700/80'
                     }`}
                   >
-                    <span className="text-[10px] font-mono text-white/90 drop-shadow-xs select-none">
+                    <span className="text-[10px] font-mono text-white/90 drop-shadow-xs select-none truncate px-0.5">
                       {segDuration}&apos;
                     </span>
                   </div>
@@ -354,7 +392,12 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
             <div className="relative w-full h-5 mt-1">
               {convergentCutPoints.map(cutMinute => {
                 const leftPercent = (cutMinute / totalMinutes) * 100;
-                const isSpecial = [18, 34, 45, 57, 79, 90, 105, 108, 120].includes(cutMinute);
+                const isSpecial =
+                  cutMinute === 0 ||
+                  cutMinute === 45 ||
+                  cutMinute === totalMinutes ||
+                  (totalMinutes > 90 && (cutMinute === 90 || cutMinute === 105)) ||
+                  allEvents.some(e => e.minute === cutMinute);
 
                 return (
                   <button
@@ -372,8 +415,8 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
                         sliderMinute === cutMinute
                           ? 'bg-indigo-600 dark:bg-indigo-400 ring-2 ring-indigo-300'
                           : isSpecial
-                          ? 'bg-amber-500'
-                          : 'bg-gray-400'
+                          ? 'bg-amber-500 ring-1 ring-amber-300'
+                          : 'bg-gray-400 dark:bg-gray-500'
                       }`}
                     />
                     <span className="text-[9px] font-mono text-gray-500 dark:text-gray-400 mt-0.5 select-none">
@@ -390,7 +433,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
               min={0}
               max={totalMinutes}
               step={1}
-              value={sliderMinute}
+              value={effectiveSliderMinute}
               onChange={e => setSliderMinute(parseInt(e.target.value, 10))}
               className="w-full mt-3 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
             />
@@ -457,58 +500,21 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
             {/* Player Performance Cards List */}
             <div className="space-y-2 flex-1 overflow-y-auto pr-1">
               {homePlayers.map((item, idx) => {
-                const isTop = idx === 0;
-                const isMatchTop = item.isMatchMvp;
-                const scorePercent = Math.min(100, Math.max(0, (item.cumulativeScore / maxScore) * 100));
-
+                const key = item.player.id || item.player.name;
                 return (
-                  <div
-                    key={item.player.id || item.player.name}
-                    className={`p-2.5 rounded-xl border transition-all ${
-                      isMatchTop
-                        ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400/60 shadow-xs'
-                        : isTop
-                        ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/60'
-                        : 'bg-white/70 dark:bg-gray-800/60 border-gray-200 dark:border-gray-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 font-mono text-[10px] font-bold text-gray-700 dark:text-gray-300">
-                          {item.player.shirtNo || idx + 1}
-                        </span>
-                        <span className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
-                          {item.player.name}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 shrink-0">
-                          {item.player.position}
-                        </span>
-                        {isMatchTop && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500 text-white shrink-0">
-                            MVP Partido
-                          </span>
-                        )}
-                      </div>
-
-                      <span className="font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400 shrink-0">
-                        {item.cumulativeScore.toFixed(3)}
-                      </span>
-                    </div>
-
-                    {/* Fluid progress bar */}
-                    <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          isMatchTop
-                            ? 'bg-amber-500'
-                            : isTop
-                            ? 'bg-indigo-600 dark:bg-indigo-500'
-                            : 'bg-indigo-500 dark:bg-indigo-600'
-                        }`}
-                        style={{ width: `${scorePercent}%` }}
-                      />
-                    </div>
-                  </div>
+                  <ErrorBoundary key={key} fallbackTitle={`Error en jugador: ${item.player.name}`}>
+                    <SoccerIntegralPlayerCard
+                      item={item}
+                      idx={idx}
+                      isTop={idx === 0}
+                      isMatchTop={item.isMatchMvp}
+                      maxScore={maxScore}
+                      isExpanded={expandedPlayerKeys.has(key)}
+                      onToggleExpand={() => toggleExpandPlayer(key)}
+                      selectedSegmentId={playerSegmentSelection[key] ?? null}
+                      onSelectSegmentId={segId => selectPlayerSegment(key, segId)}
+                    />
+                  </ErrorBoundary>
                 );
               })}
             </div>
@@ -547,58 +553,21 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
             {/* Player Performance Cards List */}
             <div className="space-y-2 flex-1 overflow-y-auto pr-1">
               {awayPlayers.map((item, idx) => {
-                const isTop = idx === 0;
-                const isMatchTop = item.isMatchMvp;
-                const scorePercent = Math.min(100, Math.max(0, (item.cumulativeScore / maxScore) * 100));
-
+                const key = item.player.id || item.player.name;
                 return (
-                  <div
-                    key={item.player.id || item.player.name}
-                    className={`p-2.5 rounded-xl border transition-all ${
-                      isMatchTop
-                        ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400/60 shadow-xs'
-                        : isTop
-                        ? 'bg-cyan-50/50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/60'
-                        : 'bg-white/70 dark:bg-gray-800/60 border-gray-200 dark:border-gray-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 font-mono text-[10px] font-bold text-gray-700 dark:text-gray-300">
-                          {item.player.shirtNo || idx + 1}
-                        </span>
-                        <span className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
-                          {item.player.name}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 shrink-0">
-                          {item.player.position}
-                        </span>
-                        {isMatchTop && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500 text-white shrink-0">
-                            MVP Partido
-                          </span>
-                        )}
-                      </div>
-
-                      <span className="font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400 shrink-0">
-                        {item.cumulativeScore.toFixed(3)}
-                      </span>
-                    </div>
-
-                    {/* Fluid progress bar */}
-                    <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          isMatchTop
-                            ? 'bg-amber-500'
-                            : isTop
-                            ? 'bg-cyan-600 dark:bg-cyan-500'
-                            : 'bg-cyan-500 dark:bg-cyan-600'
-                        }`}
-                        style={{ width: `${scorePercent}%` }}
-                      />
-                    </div>
-                  </div>
+                  <ErrorBoundary key={key} fallbackTitle={`Error en jugador: ${item.player.name}`}>
+                    <SoccerIntegralPlayerCard
+                      item={item}
+                      idx={idx}
+                      isTop={idx === 0}
+                      isMatchTop={item.isMatchMvp}
+                      maxScore={maxScore}
+                      isExpanded={expandedPlayerKeys.has(key)}
+                      onToggleExpand={() => toggleExpandPlayer(key)}
+                      selectedSegmentId={playerSegmentSelection[key] ?? null}
+                      onSelectSegmentId={segId => selectPlayerSegment(key, segId)}
+                    />
+                  </ErrorBoundary>
                 );
               })}
             </div>

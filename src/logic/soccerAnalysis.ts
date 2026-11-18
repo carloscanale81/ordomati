@@ -1,6 +1,10 @@
 import {
+  computeAffinityMatrix,
+  computeAutoinducedAffinity,
   computeContextualAffinity,
+  computeEqualizationMatrix,
   computeInverseContextualValue,
+  computeRelativeAdjustment,
   evaluateCustomPropagation
 } from './affinity';
 import { evaluateMathExpression } from './mathExpression';
@@ -10,43 +14,25 @@ import {
   computeRedistributedWeights,
   computeFinalAggregation
 } from './aggregation';
-import { SynergyConfig } from './types';
+import {
+  BlockingConfig,
+  EqualizationConfig,
+  PropagationConfig,
+  RelativeAdjustmentConfig,
+  SynergyConfig
+} from './types';
 
-export type SoccerPropagationType =
-  | 'maxRatio'
-  | 'triangular'
-  | 'rectangular'
-  | 'sinusoidal'
-  | 'inhibited'
-  | 'custom';
+export type SoccerPropagationType = PropagationConfig['type'];
+export type SoccerPropagationConfig = PropagationConfig;
 
-export interface SoccerPropagationConfig {
-  type: SoccerPropagationType;
-  limit?: number;
-  customExpr?: string;
-}
-
-export type SoccerBlockingType = 'none' | 'threshold' | 'custom';
-
-export interface SoccerBlockingConfig {
-  type: SoccerBlockingType;
-  threshold?: number;
-  customExpr?: string;
-}
+export type SoccerBlockingType = BlockingConfig['type'];
+export type SoccerBlockingConfig = BlockingConfig;
 
 export type SoccerRelativeAdjustmentType = 'none' | 'byMinutes' | 'byTouches' | 'byMean' | 'custom';
+export type SoccerRelativeAdjustmentConfig = RelativeAdjustmentConfig;
 
-export interface SoccerRelativeAdjustmentConfig {
-  type: SoccerRelativeAdjustmentType;
-  customExpr?: string;
-}
-
-export type SoccerEqualizationType = 'max' | 'sum' | 'none' | 'custom';
-
-export interface SoccerEqualizationConfig {
-  type: SoccerEqualizationType;
-  customExpr?: string;
-}
+export type SoccerEqualizationType = EqualizationConfig['type'];
+export type SoccerEqualizationConfig = EqualizationConfig;
 
 export const DEFAULT_SOCCER_PROPAGATION: SoccerPropagationConfig = { type: 'maxRatio' };
 export const DEFAULT_SOCCER_BLOCKING: SoccerBlockingConfig = { type: 'none' };
@@ -121,20 +107,59 @@ export const SOCCER_OWA_PRESETS: Record<SoccerOwaType, number[]> = {
   custom: [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0837]
 };
 
+/**
+ * Interdimensional Affinity Matrix C [12 x 12] for Soccer MVP multi-criteria aggregation.
+ * Symmetrically structured to capture football tactical coherence and mitigate
+ * isolated single-sample outliers (e.g. lucky unassisted goals, small-sample 100% pass accuracy,
+ * or accidental clearances by forwards).
+ *
+ * Dimensions:
+ * 0: dribblesWon       (Dribbles / Regates)
+ * 1: goals             (Goals / Goles)
+ * 2: aerial            (Aerials won / Duelos aéreos)
+ * 3: shotsOnTarget     (Shots on target / Tiros a puerta)
+ * 4: touches           (Touches / Toques)
+ * 5: passAccuracy      (Pass accuracy % / Acierto pases)
+ * 6: accuratePasses    (Accurate passes / Pases precisos)
+ * 7: keyPasses         (Key passes / Pases clave)
+ * 8: tacklesSuccessful (Tackles / Entradas exitosas)
+ * 9: clearances        (Clearances / Despejes)
+ * 10: interceptions    (Interceptions / Intercepciones)
+ * 11: cornerAccuracy   (Corner accuracy % / Precisión córner)
+ *
+ * Tactical Clusters:
+ * - Finishing & Threat: goals (1) <-> shotsOnTarget (3) [0.90], dribblesWon (0) [0.65], keyPasses (7) [0.60]
+ * - Core Possession: touches (4) <-> accuratePasses (6) [0.90], passAccuracy (5) [0.80]
+ * - Creation & Set-Pieces: keyPasses (7) <-> cornerAccuracy (11) [0.75], accuratePasses (6) [0.70]
+ * - Defensive Shielding: tackles (8) <-> interceptions (10) [0.85], clearances (9) [0.55], aerial (2) [0.50]
+ * - Defensive Aerial/Box: aerial (2) <-> clearances (9) [0.80], interceptions (10) [0.60]
+ * - Cross-phase Orthogonality: clearances (9) <-> goals (1) [0.10], shotsOnTarget (3) [0.10]
+ */
 export const DEFAULT_SOCCER_DIM_AFFINITY: number[][] = [
-  // 12x12 matrix: dribblesWon, goals, aerial, shotsOnTarget, touches, passAccuracy, accuratePasses, keyPasses, tacklesSuccessful, clearances, interceptions, cornerAccuracy
-  [1.0, 0.7, 0.3, 0.8, 0.7, 0.6, 0.6, 0.7, 0.4, 0.2, 0.3, 0.5],
-  [0.7, 1.0, 0.6, 0.9, 0.6, 0.5, 0.5, 0.8, 0.3, 0.2, 0.2, 0.6],
-  [0.3, 0.6, 1.0, 0.5, 0.5, 0.4, 0.4, 0.4, 0.6, 0.8, 0.6, 0.3],
-  [0.8, 0.9, 0.5, 1.0, 0.7, 0.6, 0.6, 0.8, 0.3, 0.2, 0.3, 0.6],
-  [0.7, 0.6, 0.5, 0.7, 1.0, 0.8, 0.9, 0.7, 0.6, 0.5, 0.6, 0.5],
-  [0.6, 0.5, 0.4, 0.6, 0.8, 1.0, 0.9, 0.7, 0.5, 0.4, 0.5, 0.6],
-  [0.6, 0.5, 0.4, 0.6, 0.9, 0.9, 1.0, 0.8, 0.6, 0.5, 0.6, 0.6],
-  [0.7, 0.8, 0.4, 0.8, 0.7, 0.7, 0.8, 1.0, 0.4, 0.2, 0.4, 0.8],
-  [0.4, 0.3, 0.6, 0.3, 0.6, 0.5, 0.6, 0.4, 1.0, 0.7, 0.8, 0.3],
-  [0.2, 0.2, 0.8, 0.2, 0.5, 0.4, 0.5, 0.2, 0.7, 1.0, 0.7, 0.2],
-  [0.3, 0.2, 0.6, 0.3, 0.6, 0.5, 0.6, 0.4, 0.8, 0.7, 1.0, 0.3],
-  [0.5, 0.6, 0.3, 0.6, 0.5, 0.6, 0.6, 0.8, 0.3, 0.2, 0.3, 1.0]
+  // 0: dribblesWon
+  [1.00, 0.60, 0.20, 0.65, 0.65, 0.45, 0.50, 0.70, 0.40, 0.15, 0.35, 0.40],
+  // 1: goals
+  [0.60, 1.00, 0.45, 0.90, 0.45, 0.35, 0.40, 0.60, 0.20, 0.10, 0.20, 0.35],
+  // 2: aerial
+  [0.20, 0.45, 1.00, 0.40, 0.40, 0.30, 0.30, 0.30, 0.50, 0.80, 0.60, 0.25],
+  // 3: shotsOnTarget
+  [0.65, 0.90, 0.40, 1.00, 0.55, 0.40, 0.45, 0.65, 0.20, 0.10, 0.20, 0.40],
+  // 4: touches
+  [0.65, 0.45, 0.40, 0.55, 1.00, 0.65, 0.90, 0.65, 0.55, 0.30, 0.55, 0.45],
+  // 5: passAccuracy
+  [0.45, 0.35, 0.30, 0.40, 0.65, 1.00, 0.80, 0.55, 0.40, 0.20, 0.45, 0.55],
+  // 6: accuratePasses
+  [0.50, 0.40, 0.30, 0.45, 0.90, 0.80, 1.00, 0.70, 0.50, 0.25, 0.50, 0.50],
+  // 7: keyPasses
+  [0.70, 0.60, 0.30, 0.65, 0.65, 0.55, 0.70, 1.00, 0.35, 0.15, 0.35, 0.75],
+  // 8: tacklesSuccessful
+  [0.40, 0.20, 0.50, 0.20, 0.55, 0.40, 0.50, 0.35, 1.00, 0.55, 0.85, 0.25],
+  // 9: clearances
+  [0.15, 0.10, 0.80, 0.10, 0.30, 0.20, 0.25, 0.15, 0.55, 1.00, 0.70, 0.10],
+  // 10: interceptions
+  [0.35, 0.20, 0.60, 0.20, 0.55, 0.45, 0.50, 0.35, 0.85, 0.70, 1.00, 0.25],
+  // 11: cornerAccuracy
+  [0.40, 0.35, 0.25, 0.40, 0.45, 0.55, 0.50, 0.75, 0.25, 0.10, 0.25, 1.00]
 ];
 
 export interface SoccerAggregatedAnalysis {
@@ -233,7 +258,7 @@ export interface SoccerDimensionalAnalysis {
 /**
  * Period boundaries for standard regulation (90') or extra time (120').
  */
-export const getPeriodBoundaries = (totalMinutes: number = 120): number[] => {
+export const getPeriodBoundaries = (totalMinutes: number = 90): number[] => {
   if (totalMinutes <= 90) {
     return [0, 45, 90];
   }
@@ -263,6 +288,93 @@ const CANONICAL_AWAY_SUBS: MatchSubstitution[] = [
 ];
 
 /**
+ * Determines whether match data represents a match that went to extra time (prórroga: 120').
+ * Accurately discriminates regulation matches (90' + stoppage time 91-98') from actual extra time.
+ */
+export const checkMatchHasExtraTime = (matchData: any): boolean => {
+  if (!matchData) return false;
+
+  // 1. Canonical 2026 World Cup Final recreation match
+  const is2007644 =
+    matchData?.matchId === 2007644 ||
+    String(matchData?.sourceUrl || '').includes('2007644') ||
+    String(matchData?.sourceUrl || '').includes('spain-argentina');
+  if (is2007644) return true;
+
+  // 2. Extra time score fields or period end markers
+  if (Boolean(matchData?.etScore) || matchData?.etHome !== undefined || matchData?.extraTime === true) {
+    return true;
+  }
+  if (
+    matchData?.periodEndMinutes &&
+    (Boolean(matchData.periodEndMinutes['3']) ||
+      Boolean(matchData.periodEndMinutes['4']) ||
+      Boolean(matchData.periodEndMinutes[3]) ||
+      Boolean(matchData.periodEndMinutes[4]))
+  ) {
+    return true;
+  }
+
+  // 3. Score string with explicit extra time indicator (aet, extra time, prórroga, ET)
+  const scoreStr = String(matchData?.score || '');
+  if (/\b(aet|a\.e\.t\.|extra\s*time|pr[oó]rroga)\b/i.test(scoreStr) || /\bET\b/.test(scoreStr)) {
+    return true;
+  }
+
+  // 4. Period name or string mentioning extra time
+  const periodStr = String(matchData?.period || matchData?.periodName || '');
+  if (/\b(extra|aet|pr[oó]rroga)\b/i.test(periodStr)) {
+    return true;
+  }
+
+  // 5. Period codes indicating extra time (WhoScored: 3 = FirstHalfExtraTime, 4 = SecondHalfExtraTime)
+  const pCode = Number(matchData?.periodCode);
+  if (pCode === 3 || pCode === 4) {
+    return true;
+  }
+
+  // 6. Explicit match minute duration >= 120
+  if (
+    Number(matchData?.elapsedMinutes) >= 120 ||
+    Number(matchData?.expandedMinutes) >= 120 ||
+    Number(matchData?.maxMinute) >= 120
+  ) {
+    return true;
+  }
+
+  // 7. Events specifically occurring in extra time periods (period 3, 4) or deep into extra time (> 105 min)
+  if (Array.isArray(matchData?.events)) {
+    const hasETEvent = matchData.events.some((ev: any) => {
+      const pVal = Number(ev?.period?.value ?? ev?.periodId ?? ev?.period);
+      if (pVal === 3 || pVal === 4) return true;
+      const pName = String(ev?.period?.displayName || ev?.periodName || '').toLowerCase();
+      if (pName.includes('extra')) return true;
+      if (Number(ev?.minute) > 105) return true;
+      return false;
+    });
+    if (hasETEvent) return true;
+  }
+
+  // 8. Substitutions specifically occurring in extra time periods (period 3, 4 or > 105 min)
+  const subs = [
+    ...(Array.isArray(matchData?.home?.substitutions) ? matchData.home.substitutions : []),
+    ...(Array.isArray(matchData?.away?.substitutions) ? matchData.away.substitutions : [])
+  ];
+  if (
+    subs.some((s: any) => {
+      const pVal = Number(s?.period?.value ?? s?.periodId ?? s?.period);
+      if (pVal === 3 || pVal === 4) return true;
+      if (Number(s?.minute) > 105) return true;
+      return false;
+    })
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
  * Parses match data to construct independent segmented timelines for Home and Away teams.
  * Accurately accounts for extra time (prórroga: 120'), substitutions, goals, and expulsions.
  */
@@ -272,23 +384,8 @@ export const parseSoccerTimeline = (matchData: any): SoccerTimelineResult => {
     String(matchData?.sourceUrl || '').includes('2007644') ||
     String(matchData?.sourceUrl || '').includes('spain-argentina');
 
-  // Detect if match reached extra time (prórroga)
-  const hasExtraTime =
-    is2007644 ||
-    Boolean(matchData?.etScore) ||
-    String(matchData?.score || '').toLowerCase().includes('aet') ||
-    String(matchData?.score || '').toLowerCase().includes('et') ||
-    String(matchData?.period || '').toLowerCase().includes('extra') ||
-    Number(matchData?.periodCode) === 4 ||
-    Number(matchData?.elapsedMinutes) >= 120 ||
-    Number(matchData?.expandedMinutes) >= 120 ||
-    (Array.isArray(matchData?.events) &&
-      matchData.events.some((ev: any) => Number(ev?.minute) > 90)) ||
-    (Array.isArray(matchData?.home?.substitutions) &&
-      matchData.home.substitutions.some((s: any) => Number(s?.minute) > 90)) ||
-    (Array.isArray(matchData?.away?.substitutions) &&
-      matchData.away.substitutions.some((s: any) => Number(s?.minute) > 90));
-
+  // Accurately detect if match reached extra time (prórroga: 120')
+  const hasExtraTime = checkMatchHasExtraTime(matchData);
   const totalMinutes = hasExtraTime ? 120 : 90;
 
   const homeTeamName = matchData?.home?.name || 'España';
@@ -320,11 +417,11 @@ export const parseSoccerTimeline = (matchData: any): SoccerTimelineResult => {
     matchData?.away?.substitutions ||
     extractSubsFromEvents(matchData?.events, matchData, awayTeamName, 'away');
 
-  // Fallback to canonical World Cup Final 2026 substitutions if not present in events
-  if ((!homeSubs || homeSubs.length === 0) && (is2007644 || homeTeamName === 'España')) {
+  // Fallback to canonical World Cup Final 2026 substitutions ONLY for match 2007644
+  if ((!homeSubs || homeSubs.length === 0) && is2007644) {
     homeSubs = [...CANONICAL_HOME_SUBS];
   }
-  if ((!awaySubs || awaySubs.length === 0) && (is2007644 || awayTeamName === 'Argentina')) {
+  if ((!awaySubs || awaySubs.length === 0) && is2007644) {
     awaySubs = [...CANONICAL_AWAY_SUBS];
   }
 
@@ -931,83 +1028,22 @@ export const computeSoccerDimensionalAnalysis = (
     }
   }
 
-  // 3. Affinity Matrix A via Propagation Function F_P:
-  // Default (maxRatio): diagonal = 1, off-diagonal = passes(i, j) / maxPasses.
-  const A: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
-  const propType = propagationConfig.type || 'maxRatio';
+  // 3. Affinity Matrix A via unified Propagation Function F_P:
   const L = (typeof propagationConfig.limit === 'number' && propagationConfig.limit > 0)
     ? propagationConfig.limit
     : (maxPasses || 1);
+  const cutVal = propagationConfig.limit ?? Math.max(1, Math.round(maxPasses / 2));
+  const A = computeAffinityMatrix(
+    passCounts,
+    { ...propagationConfig, limit: L },
+    { extraScope: { cut: cutVal }, precision: 4 }
+  );
 
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      if (i === j) {
-        A[i][j] = 1.0;
-      } else {
-        const d = passCounts[i][j];
-        let val = 0;
-        switch (propType) {
-          case 'maxRatio':
-            val = maxPasses > 0 ? d / maxPasses : 0;
-            break;
-          case 'triangular':
-            val = Math.max(0, (L - d) / L);
-            break;
-          case 'rectangular': {
-            const cut = propagationConfig.limit ?? Math.max(1, Math.round(maxPasses / 2));
-            val = d >= cut ? 1.0 : 0.0;
-            break;
-          }
-          case 'sinusoidal':
-            val = d <= L ? 0.5 * (1 + Math.cos(Math.PI * (d / L))) : 0;
-            break;
-          case 'inhibited':
-            val = 0;
-            break;
-          case 'custom':
-            val = evaluateCustomPropagation(d, L, 0, propagationConfig.customExpr || 'd / L');
-            break;
-          default:
-            val = maxPasses > 0 ? d / maxPasses : 0;
-        }
-        A[i][j] = Number(Math.max(0, Math.min(1, val)).toFixed(4));
-      }
-    }
-  }
+  // 4. Blocking Function F_B via unified Autoinduced Matrix calculation:
+  const AAI = computeAutoinducedAffinity(A, undefined, blockingConfig);
 
-  // 4. Blocking Function: Default without blocking (A^AI = A)
-  const AAI: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
-  const blockType = blockingConfig.type || 'none';
-  const blockThreshold = typeof blockingConfig.threshold === 'number' ? blockingConfig.threshold : 0.15;
-
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      if (i === j) {
-        AAI[i][j] = 1.0;
-      } else {
-        if (blockType === 'threshold') {
-          AAI[i][j] = A[i][j] < blockThreshold ? 0.0 : A[i][j];
-        } else if (blockType === 'custom') {
-          const res = evaluateMathExpression(
-            blockingConfig.customExpr || 'a < theta ? 0 : a',
-            { a: A[i][j], theta: blockThreshold, umbral: blockThreshold, i, j },
-            A[i][j]
-          );
-          AAI[i][j] = Math.max(0, Math.min(1, Number.isFinite(res) ? res : A[i][j]));
-        } else {
-          // 'none'
-          AAI[i][j] = A[i][j];
-        }
-      }
-    }
-  }
-
-  // 5. Synergy Function: Default without synergy (A^C = A^AI)
-  const AC: number[][] = computeContextualAffinity(AAI, synergyConfig);
-  // Guarantee unit diagonal is strictly preserved
-  for (let i = 0; i < n; i++) {
-    AC[i][i] = 1.0;
-  }
+  // 5. Synergy Function F_S via unified Contextual Affinity calculation:
+  const AC = computeContextualAffinity(AAI, synergyConfig);
 
   // 6. Contextual Value vector VC based on selected concept
   const VC: number[] = Array(n).fill(0);
@@ -1204,57 +1240,18 @@ export const computeSoccerDimensionalAnalysis = (
     }
   }
 
-  // 7. Relative Adjustment: Weighting of V^C (default 'none', ca = 1)
-  const ca: number[] = Array(n).fill(1.0);
-  const relType = relativeConfig.type || 'none';
-
-  if (relType === 'byMinutes') {
-    const fraction = segment.duration / 90;
-    ca.fill(fraction > 0 ? fraction : 1.0);
-  } else if (relType === 'byTouches') {
-    const playerTouches = players.map((_, i) => {
-      let tCount = 0;
-      for (let j = 0; j < n; j++) tCount += passCounts[i][j] + passCounts[j][i];
-      return tCount;
-    });
-    const avgT = playerTouches.reduce((a, b) => a + b, 0) / (n || 1);
-    for (let i = 0; i < n; i++) {
-      ca[i] = playerTouches[i] > 0 ? avgT / playerTouches[i] : 1.0;
-    }
-  } else if (relType === 'byMean') {
-    const meanVC = VC.reduce((a, b) => a + b, 0) / (n || 1);
-    for (let i = 0; i < n; i++) {
-      ca[i] = meanVC > 0 ? 1.0 / meanVC : 1.0;
-    }
-  } else if (relType === 'custom') {
-    const playerTouches = players.map((_, i) => {
-      let tCount = 0;
-      for (let j = 0; j < n; j++) tCount += passCounts[i][j] + passCounts[j][i];
-      return tCount;
-    });
-    const avgT = playerTouches.reduce((a, b) => a + b, 0) / (n || 1);
-    const meanVC = VC.reduce((a, b) => a + b, 0) / (n || 1);
-    for (let i = 0; i < n; i++) {
-      const res = evaluateMathExpression(
-        relativeConfig.customExpr || '1',
-        {
-          m: segment.duration,
-          minutos: segment.duration,
-          T: 90,
-          minutos_totales: 90,
-          toques: playerTouches[i],
-          media_toques: avgT,
-          vc: VC[i],
-          media_vc: meanVC,
-          i
-        },
-        1.0
-      );
-      ca[i] = Math.max(0, Number.isFinite(res) ? res : 1.0);
-    }
-  }
-
-  const VCR = VC.map((v, i) => v * ca[i]);
+  // 7. Relative Adjustment via unified Relative Adjustment Function:
+  const playerTouches = players.map((_, i) => {
+    let tCount = 0;
+    for (let j = 0; j < n; j++) tCount += passCounts[i][j] + passCounts[j][i];
+    return tCount;
+  });
+  const { ca, VCR } = computeRelativeAdjustment(VC, {
+    ...relativeConfig,
+    duration: segment.duration,
+    totalDuration: 90,
+    touches: playerTouches
+  });
 
   // 8. Solve Own Value vector VP via matrix inversion: V^P = (A^C)⁻¹ · V^CR
   let VP: number[] | null = null;
@@ -1498,54 +1495,8 @@ export const computeSoccerAggregatedAnalysis = (
     }
   }
 
-  // 1b. Equalization adjustment (default 'max' globally or per dimension):
-  const equalizedV: number[][] = Array.from({ length: n }, () => Array(m).fill(0));
-
-  for (let j = 0; j < m; j++) {
-    const dimEqConfig = Array.isArray(equalizationConfig) ? equalizationConfig[j] : equalizationConfig;
-    const eqType = dimEqConfig?.type || 'max';
-    if (eqType === 'max') {
-      let maxVal = 0;
-      for (let i = 0; i < n; i++) {
-        if (V[i][j] > maxVal) maxVal = V[i][j];
-      }
-      for (let i = 0; i < n; i++) {
-        equalizedV[i][j] = maxVal > 0 ? Number((V[i][j] / maxVal).toFixed(4)) : 0;
-      }
-    } else if (eqType === 'sum') {
-      let sumVal = 0;
-      for (let i = 0; i < n; i++) sumVal += V[i][j];
-      for (let i = 0; i < n; i++) {
-        equalizedV[i][j] = sumVal > 0 ? Number((V[i][j] / sumVal).toFixed(4)) : 0;
-      }
-    } else if (eqType === 'custom') {
-      let maxVal = 0;
-      let sumVal = 0;
-      for (let i = 0; i < n; i++) {
-        if (V[i][j] > maxVal) maxVal = V[i][j];
-        sumVal += V[i][j];
-      }
-      for (let i = 0; i < n; i++) {
-        const res = evaluateMathExpression(
-          dimEqConfig?.customExpr || 'vp / max_vp',
-          {
-            vp: V[i][j],
-            max_vp: maxVal || 1,
-            sum_vp: sumVal || 1,
-            i,
-            j
-          },
-          V[i][j]
-        );
-        equalizedV[i][j] = Math.max(0, Number.isFinite(res) ? Number(res.toFixed(4)) : V[i][j]);
-      }
-    } else {
-      // 'none'
-      for (let i = 0; i < n; i++) {
-        equalizedV[i][j] = V[i][j];
-      }
-    }
-  }
+  // 1b. Equalization adjustment via unified computeEqualizationMatrix:
+  const equalizedV = computeEqualizationMatrix(V, equalizationConfig);
 
   // Ensure dimension affinity matrix is m x m
   let cMatrix = dimAffinityMatrix;
@@ -1594,7 +1545,7 @@ export const computeSoccerAggregatedAnalysis = (
 export const getConvergentCutPoints = (
   homeSegments: TimelineSegment[],
   awaySegments: TimelineSegment[],
-  totalMinutes: number = 120
+  totalMinutes: number = 90
 ): number[] => {
   const periodBoundaries = getPeriodBoundaries(totalMinutes);
   const cutPointsSet = new Set<number>(periodBoundaries);
@@ -1621,6 +1572,39 @@ export const getConvergentCutPoints = (
   return Array.from(cutPointsSet).sort((a, b) => a - b);
 };
 
+export interface PlayerSegmentBreakdown {
+  segmentId: string;
+  segmentName: string;
+  startMinute: number;
+  endMinute: number;
+  duration: number;
+  weightPercent: number; // e.g. 63.3
+  effectiveWeight: number; // duration / totalMinutes
+  isActive: boolean;
+  segmentScore: number; // aggregated score in this segment
+  weightedScore: number; // segmentScore * effectiveWeight
+  rawStats: Record<string, number | string>;
+  dimScores: Array<{
+    concept: SoccerConcept;
+    conceptName: string;
+    unit: string;
+    rawVC: number;
+    vp: number;
+  }>;
+}
+
+export interface PlayerFullMatchData {
+  minutesPlayed: number;
+  rawStats: Record<string, number | string>;
+  dimCumulativeScores: Array<{
+    concept: SoccerConcept;
+    conceptName: string;
+    unit: string;
+    rawTotalVC: number;
+    cumulativeVp: number;
+  }>;
+}
+
 export interface IntegralMatchPlayerScore {
   player: MatchPlayer;
   team: 'home' | 'away';
@@ -1629,6 +1613,8 @@ export interface IntegralMatchPlayerScore {
   isFirstEleven: boolean;
   isMvp: boolean;
   isMatchMvp: boolean;
+  segments?: PlayerSegmentBreakdown[];
+  fullMatch?: PlayerFullMatchData;
 }
 
 export interface IntegralMatchAnalysisResult {
@@ -1643,6 +1629,217 @@ export interface IntegralMatchAnalysisResult {
 }
 
 /**
+ * Extracts raw event counts and match statistics for a player, optionally filtered to a single segment.
+ */
+export const extractPlayerStats = (
+  matchData: any,
+  player: MatchPlayer,
+  segment?: TimelineSegment
+): Record<string, number | string> => {
+  const isSegment = Boolean(segment);
+  const startMin = segment ? segment.startMinute : 0;
+  const endMin = segment ? segment.endMinute : 999;
+
+  const rawList = player.team === 'home' ? matchData?.home?.players : matchData?.away?.players;
+  const rawP = Array.isArray(rawList)
+    ? rawList.find(
+        (p: any) =>
+          (p.playerId && p.playerId === player.id) ||
+          p.id === player.id ||
+          p.name === player.name
+      )
+    : null;
+
+  const rawStats = rawP?.stats || {};
+  const events: any[] = Array.isArray(matchData?.events) ? matchData.events : [];
+
+  const playerEvents = events.filter(ev => {
+    const min = Number(ev.minute || 0);
+    if (min < startMin || min > endMin) return false;
+    if (ev.playerId && player.id && Number(ev.playerId) === Number(player.id)) return true;
+    const evName = (ev.player || ev.playerName || '').toLowerCase();
+    const pName = (player.name || '').toLowerCase();
+    return evName && pName && (evName === pName || evName.includes(pName) || pName.includes(evName));
+  });
+
+  const passes = playerEvents.filter(
+    ev => ev.type === 'Pass' || ev.type?.displayName === 'Pass' || ev.type?.value === 1
+  );
+  const passesAccurate = passes.filter(
+    ev => ev.outcome === 'Successful' || ev.outcomeType?.displayName === 'Successful'
+  );
+  const passAccPct =
+    passes.length > 0
+      ? `${((passesAccurate.length / passes.length) * 100).toFixed(1)}%`
+      : isSegment
+      ? '-'
+      : rawStats.passSuccess
+      ? `${rawStats.passSuccess}%`
+      : '-';
+
+  const goals = playerEvents.filter(
+    ev =>
+      (ev.type === 'Goal' || ev.type?.displayName === 'Goal' || ev.type?.value === 16) &&
+      ev.outcome !== 'Unsuccessful'
+  ).length;
+
+  const assists = playerEvents.filter(
+    ev => Boolean(ev.assist || ev.assistPlayerName || ev.isAssist)
+  ).length;
+
+  const shots = playerEvents.filter(
+    ev =>
+      ev.type === 'Shot' ||
+      ev.type?.displayName === 'Shot' ||
+      ev.type === 'Goal' ||
+      ev.type?.value === 13 ||
+      ev.type?.value === 14 ||
+      ev.type?.value === 15 ||
+      ev.type?.value === 16
+  ).length;
+
+  const shotsOnTarget = playerEvents.filter(
+    ev =>
+      (ev.type === 'Shot' ||
+        ev.type?.displayName === 'Shot' ||
+        ev.type === 'Goal' ||
+        ev.type === 'SavedShot' ||
+        ev.type?.value === 13 ||
+        ev.type?.value === 14 ||
+        ev.type?.value === 15 ||
+        ev.type?.value === 16) &&
+      (ev.outcome === 'SavedShot' ||
+        ev.type === 'Goal' ||
+        ev.outcome === 'Successful' ||
+        ev.outcomeType?.displayName === 'Successful')
+  ).length;
+
+  const dribbles = playerEvents.filter(
+    ev =>
+      (ev.type === 'Dribble' || ev.type?.displayName === 'TakeOn' || ev.type?.value === 3) &&
+      (ev.outcome === 'Successful' || ev.outcomeType?.displayName === 'Successful')
+  ).length;
+
+  const aerials = playerEvents.filter(
+    ev =>
+      (ev.type === 'Aerial' || ev.type?.displayName === 'Aerial' || ev.type?.value === 44) &&
+      (ev.outcome === 'Successful' || ev.outcomeType?.displayName === 'Successful')
+  ).length;
+
+  const tackles = playerEvents.filter(
+    ev =>
+      (ev.type === 'Tackle' || ev.type?.displayName === 'Tackle' || ev.type?.value === 7) &&
+      (ev.outcome === 'Successful' || ev.outcomeType?.displayName === 'Successful')
+  ).length;
+
+  const interceptions = playerEvents.filter(
+    ev => ev.type === 'Interception' || ev.type?.displayName === 'Interception' || ev.type?.value === 8
+  ).length;
+
+  const clearances = playerEvents.filter(
+    ev => ev.type === 'Clearance' || ev.type?.displayName === 'Clearance' || ev.type?.value === 10
+  ).length;
+
+  const saves = playerEvents.filter(
+    ev => ev.type === 'Save' || ev.type?.displayName === 'Save' || ev.type?.value === 12
+  ).length;
+
+  const keyPasses = playerEvents.filter(ev => Boolean(ev.keyPass || ev.isKeyPass)).length;
+
+  const cards = playerEvents.filter(ev => ev.type === 'Card' || ev.type?.displayName === 'Card');
+  const yellowCards = cards.filter(
+    ev =>
+      ev.cardType === 'Yellow' ||
+      ev.cardType?.displayName === 'Yellow' ||
+      String(ev.outcome).includes('Yellow')
+  ).length;
+  const redCards = cards.filter(
+    ev =>
+      ev.cardType === 'Red' ||
+      ev.cardType?.displayName === 'Red' ||
+      String(ev.outcome).includes('Red')
+  ).length;
+
+  if (isSegment) {
+    return {
+      minutesInSegment: segment ? segment.duration : 0,
+      goals,
+      assists,
+      passesTotal: passes.length,
+      passesAccurate: passesAccurate.length,
+      passAccuracy: passAccPct,
+      shotsTotal: shots,
+      shotsOnTarget,
+      dribblesWon: dribbles,
+      aerialWon: aerials,
+      tacklesWon: tackles,
+      interceptions,
+      clearances,
+      saves,
+      keyPasses,
+      yellowCards,
+      redCards
+    };
+  }
+
+  const toNum = (val: any, fallback: number = 0): number => {
+    if (val === undefined || val === null) return fallback;
+    if (typeof val === 'number') return isNaN(val) ? fallback : val;
+    if (typeof val === 'string') {
+      const n = Number(val);
+      return isNaN(n) ? fallback : n;
+    }
+    if (typeof val === 'object') {
+      const vals = Object.values(val);
+      if (vals.length > 0) {
+        const last = Number(vals[vals.length - 1]);
+        return isNaN(last) ? fallback : last;
+      }
+    }
+    return fallback;
+  };
+
+  let parsedRating: number | string = 7.0;
+  const rawR = rawStats.rating ?? rawStats.ratings ?? rawP?.rating ?? rawP?.ratings;
+  if (typeof rawR === 'number') {
+    parsedRating = Number(rawR.toFixed(2));
+  } else if (typeof rawR === 'string' && !isNaN(Number(rawR))) {
+    parsedRating = Number(Number(rawR).toFixed(2));
+  } else if (typeof rawR === 'object' && rawR !== null) {
+    const keys = Object.keys(rawR);
+    if (keys.length > 0) {
+      const lastKey = keys[keys.length - 1];
+      const val = Number((rawR as any)[lastKey]);
+      parsedRating = !isNaN(val) ? Number(val.toFixed(2)) : 7.0;
+    }
+  }
+
+  return {
+    rating: parsedRating,
+    minutesPlayed: toNum(rawP?.minutesPlayed, 0),
+    goals: toNum(rawStats.goals, goals),
+    assists: toNum(rawStats.assists, assists),
+    passesTotal: toNum(
+      rawStats.passesTotal,
+      passes.length || (rawStats.passesAccurate ? toNum(rawStats.passesAccurate) + 5 : 0)
+    ),
+    passesAccurate: toNum(rawStats.passesAccurate, passesAccurate.length),
+    passAccuracy: rawStats.passSuccess ? `${toNum(rawStats.passSuccess)}%` : passAccPct,
+    shotsTotal: toNum(rawStats.shotsTotal, shots),
+    shotsOnTarget: toNum(rawStats.shotsOnTarget, shotsOnTarget),
+    dribblesWon: toNum(rawStats.dribblesSuccess, dribbles),
+    aerialWon: toNum(rawStats.aerialWon, aerials),
+    tacklesWon: toNum(rawStats.tackles, tackles),
+    interceptions: toNum(rawStats.interceptions, interceptions),
+    clearances: toNum(rawStats.clearances, clearances),
+    saves: toNum(rawStats.saves, saves),
+    keyPasses: toNum(rawStats.keyPasses, keyPasses),
+    yellowCards: toNum(rawStats.yellowCards, yellowCards),
+    redCards: toNum(rawStats.redCards, redCards)
+  };
+};
+
+/**
  * Computes cumulative player performance growth up to currentMinute.
  * The cumulative score for a player up to minute T is the sum of their segment scores
  * weighted by the portion of duration of the segment relative to total match minutes:
@@ -1651,11 +1848,11 @@ export interface IntegralMatchAnalysisResult {
 export const computeIntegralMatchCumulativeScores = (
   timeline: SoccerTimelineResult,
   matchData: any,
-  selectedConceptOrAgg: SoccerConcept | 'aggregate',
-  owaConfig: SoccerOwaConfig,
-  dimAffinityMatrix: number[][],
-  synergyConfigs: Record<SoccerConcept, SynergyConfig>,
-  currentMinute: number,
+  selectedConceptOrAgg: SoccerConcept | 'aggregate' = 'aggregate',
+  owaConfig: SoccerOwaConfig = { type: 'average', weights: Array(12).fill(1 / 12) },
+  dimAffinityMatrix: number[][] = Array.from({ length: 12 }, () => Array(12).fill(0)),
+  synergyConfigs: Record<SoccerConcept, SynergyConfig> = {} as any,
+  currentMinute: number = timeline?.totalMinutes ?? 120,
   propagationConfig: SoccerPropagationConfig = { type: 'maxRatio' },
   blockingConfig: SoccerBlockingConfig = { type: 'none' },
   relativeConfig: SoccerRelativeAdjustmentConfig = { type: 'none' },
@@ -1687,93 +1884,182 @@ export const computeIntegralMatchCumulativeScores = (
   homeAllPlayers.forEach(p => homeCumulative.set(p.id || p.name, 0));
   awayAllPlayers.forEach(p => awayCumulative.set(p.id || p.name, 0));
 
+  const playerSegmentMap = new Map<number | string, PlayerSegmentBreakdown[]>();
+  const playerDimCumMap = new Map<number | string, Map<SoccerConcept, { rawTotalVC: number; cumulativeVp: number }>>();
+
+  const initPlayerData = (allPlayers: MatchPlayer[]) => {
+    allPlayers.forEach(p => {
+      const key = p.id || p.name;
+      playerSegmentMap.set(key, []);
+      const dimMap = new Map<SoccerConcept, { rawTotalVC: number; cumulativeVp: number }>();
+      SOCCER_CONCEPTS.forEach(cfg => {
+        dimMap.set(cfg.key, { rawTotalVC: 0, cumulativeVp: 0 });
+      });
+      playerDimCumMap.set(key, dimMap);
+    });
+  };
+
+  initPlayerData(homeAllPlayers);
+  initPlayerData(awayAllPlayers);
+
   const accumulateTeamScores = (
     team: 'home' | 'away',
     segments: TimelineSegment[],
-    cumulativeMap: Map<number | string, number>
+    cumulativeMap: Map<number | string, number>,
+    allTeamPlayers: MatchPlayer[]
   ) => {
     segments.forEach(seg => {
-      if (seg.startMinute >= clampedMinute) return;
       const effectiveEnd = Math.min(seg.endMinute, clampedMinute);
-      const effectiveDuration = effectiveEnd - seg.startMinute;
-      if (effectiveDuration <= 0) return;
-
+      const effectiveDuration = Math.max(0, effectiveEnd - seg.startMinute);
       const weight = effectiveDuration / totalMinutes;
+      const fullSegWeight = seg.duration / totalMinutes;
 
-      // Compute score for each active player in this segment
-      if (selectedConceptOrAgg === 'aggregate') {
-        const dimAnalyses = SOCCER_CONCEPTS.map(cfg =>
-          computeSoccerDimensionalAnalysis(
-            matchData,
-            seg,
-            true,
-            synergyConfigs[cfg.key] || { type: 'none', k: 1.0 },
-            cfg.key,
-            propagationConfig,
-            blockingConfig,
-            relativeConfig
-          )
-        );
-        const agg = computeSoccerAggregatedAnalysis(
-          dimAnalyses,
-          seg,
-          owaConfig,
-          dimAffinityMatrix,
-          equalizationConfig
-        );
-        agg.players.forEach((p, idx) => {
-          const score = agg.scores[idx] || 0;
-          const key = p.id || p.name;
-          const current = cumulativeMap.get(key) || 0;
-          cumulativeMap.set(key, current + score * weight);
-        });
-      } else {
-        const dim = computeSoccerDimensionalAnalysis(
+      // Always compute all 12 dimensional analyses and aggregation for this segment so we have the complete breakdown
+      const dimAnalyses = SOCCER_CONCEPTS.map(cfg =>
+        computeSoccerDimensionalAnalysis(
           matchData,
           seg,
           true,
-          synergyConfigs[selectedConceptOrAgg] || { type: 'none', k: 1.0 },
-          selectedConceptOrAgg,
+          (synergyConfigs && synergyConfigs[cfg.key]) || { type: 'none', k: 1.0 },
+          cfg.key,
           propagationConfig,
           blockingConfig,
           relativeConfig
-        );
-        dim.players.forEach((p, idx) => {
-          const score = dim.VP ? Math.max(0, dim.VP[idx]) : dim.VC[idx] || 0;
-          const key = p.id || p.name;
-          const current = cumulativeMap.get(key) || 0;
-          cumulativeMap.set(key, current + score * weight);
+        )
+      );
+      const agg = computeSoccerAggregatedAnalysis(
+        dimAnalyses,
+        seg,
+        owaConfig,
+        dimAffinityMatrix,
+        equalizationConfig
+      );
+
+      // Record segment breakdown for each participating player
+      allTeamPlayers.forEach(p => {
+        const key = p.id || p.name;
+        const pIdx = seg.activePlayers.findIndex(ap => (ap.id && ap.id === p.id) || ap.name === p.name);
+        const isActive = pIdx !== -1;
+        const segScore = isActive ? (agg.scores[pIdx] || 0) : 0;
+
+        const dimScores = SOCCER_CONCEPTS.map((cfg, cIdx) => {
+          const da = dimAnalyses[cIdx];
+          const rawVC = isActive && da.VC && da.VC[pIdx] !== undefined ? da.VC[pIdx] : 0;
+          const vp = isActive && da.VP && da.VP[pIdx] !== undefined
+            ? Math.max(0, da.VP[pIdx])
+            : (isActive ? da.VC[pIdx] || 0 : 0);
+
+          if (seg.startMinute < clampedMinute && effectiveDuration > 0) {
+            const playerDims = playerDimCumMap.get(key);
+            if (playerDims && playerDims.has(cfg.key)) {
+              const entry = playerDims.get(cfg.key)!;
+              entry.rawTotalVC += rawVC;
+              entry.cumulativeVp += vp * weight;
+            }
+          }
+
+          return {
+            concept: cfg.key,
+            conceptName: cfg.name,
+            unit: cfg.unit,
+            rawVC,
+            vp: Number(vp.toFixed(4))
+          };
         });
+
+        const segRawStats = extractPlayerStats(matchData, p, seg);
+        const breakdownList = playerSegmentMap.get(key) || [];
+        breakdownList.push({
+          segmentId: seg.id,
+          segmentName: seg.label || `Segmento [${seg.startMinute}' - ${seg.endMinute}']`,
+          startMinute: seg.startMinute,
+          endMinute: seg.endMinute,
+          duration: seg.duration,
+          weightPercent: Number(((seg.duration / totalMinutes) * 100).toFixed(1)),
+          effectiveWeight: Number(fullSegWeight.toFixed(4)),
+          isActive,
+          segmentScore: Number(segScore.toFixed(4)),
+          weightedScore: Number((segScore * fullSegWeight).toFixed(4)),
+          rawStats: segRawStats,
+          dimScores
+        });
+        playerSegmentMap.set(key, breakdownList);
+      });
+
+      // If segment is within currentMinute range, accumulate score for cumulative ranking
+      if (seg.startMinute < clampedMinute && effectiveDuration > 0) {
+        if (selectedConceptOrAgg === 'aggregate') {
+          agg.players.forEach((p, idx) => {
+            const score = agg.scores[idx] || 0;
+            const key = p.id || p.name;
+            const current = cumulativeMap.get(key) || 0;
+            cumulativeMap.set(key, current + score * weight);
+          });
+        } else {
+          const dimIdx = SOCCER_CONCEPTS.findIndex(c => c.key === selectedConceptOrAgg);
+          const dim = dimIdx !== -1 ? dimAnalyses[dimIdx] : dimAnalyses[0];
+          dim.players.forEach((p, idx) => {
+            const score = dim.VP ? Math.max(0, dim.VP[idx]) : dim.VC[idx] || 0;
+            const key = p.id || p.name;
+            const current = cumulativeMap.get(key) || 0;
+            cumulativeMap.set(key, current + score * weight);
+          });
+        }
       }
     });
   };
 
-  accumulateTeamScores('home', timeline.homeSegments, homeCumulative);
-  accumulateTeamScores('away', timeline.awaySegments, awayCumulative);
+  accumulateTeamScores('home', timeline.homeSegments, homeCumulative, homeAllPlayers);
+  accumulateTeamScores('away', timeline.awaySegments, awayCumulative, awayAllPlayers);
+
+  const buildPlayerScoreItem = (
+    p: MatchPlayer,
+    team: 'home' | 'away',
+    teamName: string,
+    cumulativeMap: Map<number | string, number>
+  ): IntegralMatchPlayerScore => {
+    const key = p.id || p.name;
+    const fullStats = extractPlayerStats(matchData, p);
+    const segs = team === 'home' ? timeline.homeSegments : timeline.awaySegments;
+    const minutesPlayed = segs
+      .filter(s => s.activePlayers.some(ap => (ap.id && ap.id === p.id) || ap.name === p.name))
+      .reduce((sum, s) => sum + s.duration, 0);
+
+    const dimCumulativeScores = SOCCER_CONCEPTS.map(cfg => {
+      const entry = playerDimCumMap.get(key)?.get(cfg.key) || { rawTotalVC: 0, cumulativeVp: 0 };
+      return {
+        concept: cfg.key,
+        conceptName: cfg.name,
+        unit: cfg.unit,
+        rawTotalVC: entry.rawTotalVC,
+        cumulativeVp: Number(entry.cumulativeVp.toFixed(4))
+      };
+    });
+
+    return {
+      player: p,
+      team,
+      teamName,
+      cumulativeScore: Number((cumulativeMap.get(key) || 0).toFixed(4)),
+      isFirstEleven: p.isFirstEleven,
+      isMvp: false,
+      isMatchMvp: false,
+      segments: playerSegmentMap.get(key) || [],
+      fullMatch: {
+        minutesPlayed,
+        rawStats: { ...fullStats, minutesPlayed },
+        dimCumulativeScores
+      }
+    };
+  };
 
   // Build sorted lists
   const homePlayerScores: IntegralMatchPlayerScore[] = homeAllPlayers
-    .map(p => ({
-      player: p,
-      team: 'home' as const,
-      teamName: timeline.homeTeamName,
-      cumulativeScore: Number((homeCumulative.get(p.id || p.name) || 0).toFixed(4)),
-      isFirstEleven: p.isFirstEleven,
-      isMvp: false,
-      isMatchMvp: false
-    }))
+    .map(p => buildPlayerScoreItem(p, 'home', timeline.homeTeamName, homeCumulative))
     .sort((a, b) => b.cumulativeScore - a.cumulativeScore);
 
   const awayPlayerScores: IntegralMatchPlayerScore[] = awayAllPlayers
-    .map(p => ({
-      player: p,
-      team: 'away' as const,
-      teamName: timeline.awayTeamName,
-      cumulativeScore: Number((awayCumulative.get(p.id || p.name) || 0).toFixed(4)),
-      isFirstEleven: p.isFirstEleven,
-      isMvp: false,
-      isMatchMvp: false
-    }))
+    .map(p => buildPlayerScoreItem(p, 'away', timeline.awayTeamName, awayCumulative))
     .sort((a, b) => b.cumulativeScore - a.cumulativeScore);
 
   // Identify MVPs only if there is a positive cumulative score

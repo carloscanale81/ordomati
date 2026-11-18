@@ -9,20 +9,28 @@ export type CharacteristicType = 'quantitative' | 'qualitative' | 'adjustment';
 export type Granularity = 3 | 5 | 7 | number;
 export type Semantics = 'core' | 'support';
 
-export type PropagationType = 'inhibited' | 'triangular' | 'rectangular' | 'trapezoidal' | 'sinusoidal' | 'custom';
+export type PropagationType =
+  | 'inhibited'
+  | 'triangular'
+  | 'rectangular'
+  | 'trapezoidal'
+  | 'sinusoidal'
+  | 'maxRatio'
+  | 'custom';
 
 export interface PropagationConfig {
   type: PropagationType;
-  limit: number;
+  limit?: number;
   l1?: number;
   customExpr?: string; // Mathematical expression f(d, L, L1, L2), e.g. 'exp(-d / L)'
 }
 
-export type BlockingType = 'standard' | 'custom';
+export type BlockingType = 'standard' | 'threshold' | 'custom' | 'none';
 
 export interface BlockingConfig {
   type: BlockingType;
-  customExpr?: string; // Mathematical expression f(a, S, vb, i, j), e.g. 'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))'
+  threshold?: number; // Threshold for threshold-based blocking (e.g. theta = 0.15)
+  customExpr?: string; // Mathematical expression f(a, S, vb, theta, i, j)
 }
 
 export type SynergyType = 'none' | 'factor' | 'custom';
@@ -33,13 +41,34 @@ export interface SynergyConfig {
   customExpr?: string; // Mathematical expression f(a, k), e.g. 'min(1, a * k)'
 }
 
-export type NormType = 'none' | 'maximum' | 'target';
+export type NormType = 'none' | 'maximum' | 'target' | 'max' | 'sum' | 'custom';
+
+export type EqualizationType = 'max' | 'maximum' | 'sum' | 'target' | 'none' | 'custom';
+
+export interface EqualizationConfig {
+  type: EqualizationType;
+  obj?: number; // Target reference value if normType is 'target'
+  customExpr?: string; // Custom mathematical expression
+}
+
+export interface EqualizationOptions extends EqualizationConfig {
+  precision?: number;
+}
+
+export type RelativeAdjustmentType = 'byPop' | 'byMinutes' | 'byTouches' | 'byMean' | 'none' | 'custom';
+
+export interface RelativeAdjustmentConfig {
+  type?: RelativeAdjustmentType;
+  byPop?: number;
+  customExpr?: string;
+}
 
 export interface AdjustmentConfig {
   targetValue?: 'vp' | 'vc'; // Base target value used for adjustment and aggregation ('vp': Own Value, 'vc': Contextual Value)
   byPop: number; // Index of the population characteristic used for relative adjustment, or -1 for none
   normType: NormType;
   obj: number; // Target reference value if normType is 'target'
+  customExpr?: string;
 }
 
 export type ScaleMode = 'manual' | 'dynamic';
@@ -90,6 +119,7 @@ export interface Characteristic {
 }
 
 export interface OrdomaticaDataset {
+  description?: string; // Optional description of the problem, criteria, and decision context
   elements: string[];
   elementImages?: string[]; // Optional image URL or base64 data URL per element aligned with elements array
   characteristics: Characteristic[];

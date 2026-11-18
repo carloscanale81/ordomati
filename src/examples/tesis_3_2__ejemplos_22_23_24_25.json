@@ -1,0 +1,282 @@
+{
+  "version": "2.0.0",
+  "exportedAt": "2026-11-17T16:30:44.257Z",
+  "dataset": {
+    "description": "Ejemplos 22, 23, 24 y 25 del 3.2 Modelo de Análisis Característico de la Tesis \"La Sonrisa de Mona Lisa: Una Introducción a la Ordomática\"",
+    "elements": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "elementImages": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "decimalPrecision": 2,
+    "dimensions": [
+      {
+        "id": 1794932566703,
+        "name": "D1",
+        "type": "quantitative",
+        "min": 28,
+        "max": 60,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "35",
+          "43",
+          "28",
+          "60"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            13,
+            4,
+            20
+          ],
+          [
+            13,
+            0,
+            7,
+            34
+          ],
+          [
+            4,
+            7,
+            0,
+            2
+          ],
+          [
+            20,
+            34,
+            2,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            13,
+            4,
+            20
+          ],
+          [
+            13,
+            0,
+            7,
+            34
+          ],
+          [
+            4,
+            7,
+            0,
+            2
+          ],
+          [
+            20,
+            34,
+            2,
+            0
+          ]
+        ],
+        "blockingVector": [
+          1,
+          0,
+          0.2,
+          0.5
+        ],
+        "vb": [
+          1,
+          0,
+          0.2,
+          0.5
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc"
+      }
+    ],
+    "characteristics": [
+      {
+        "id": 1794932566703,
+        "name": "D1",
+        "type": "quantitative",
+        "min": 28,
+        "max": 60,
+        "minMode": "dynamic",
+        "maxMode": "dynamic",
+        "granularity": 5,
+        "g": 5,
+        "semantics": "core",
+        "sem": "core",
+        "rawInputs": [
+          "35",
+          "43",
+          "28",
+          "60"
+        ],
+        "distanceMatrix": [
+          [
+            0,
+            13,
+            4,
+            20
+          ],
+          [
+            13,
+            0,
+            7,
+            34
+          ],
+          [
+            4,
+            7,
+            0,
+            2
+          ],
+          [
+            20,
+            34,
+            2,
+            0
+          ]
+        ],
+        "d": [
+          [
+            0,
+            13,
+            4,
+            20
+          ],
+          [
+            13,
+            0,
+            7,
+            34
+          ],
+          [
+            4,
+            7,
+            0,
+            2
+          ],
+          [
+            20,
+            34,
+            2,
+            0
+          ]
+        ],
+        "blockingVector": [
+          1,
+          0,
+          0.2,
+          0.5
+        ],
+        "vb": [
+          1,
+          0,
+          0.2,
+          0.5
+        ],
+        "blockingConfig": {
+          "type": "standard"
+        },
+        "block": {
+          "type": "standard"
+        },
+        "propagationConfig": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "prop": {
+          "type": "triangular",
+          "limit": 10,
+          "l1": 5
+        },
+        "synergyConfig": {
+          "type": "none",
+          "k": 1
+        },
+        "syn": {
+          "type": "none",
+          "k": 1
+        },
+        "adjustmentConfig": {
+          "targetValue": "vc",
+          "relativeContrastDimensionIndex": -1,
+          "equalizationMode": "none",
+          "targetObjective": 1
+        },
+        "adj": {
+          "targetValue": "vc",
+          "byPop": -1,
+          "normType": "none",
+          "obj": 1
+        },
+        "calculationTarget": "vc",
+        "calcTarget": "vc"
+      }
+    ],
+    "criteriaCorrelationMatrix": [
+      [
+        1
+      ]
+    ],
+    "cMatrix": [
+      [
+        1
+      ]
+    ],
+    "orderedWeightedAveragingWeights": [
+      1
+    ],
+    "owa": [
+      1
+    ]
+  }
+}

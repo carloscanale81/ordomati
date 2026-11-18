@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Camera } from 'lucide-react';
+import { Plus, Trash2, Camera, FileText } from 'lucide-react';
 import { Card } from '../components/Card';
 import { OrbBadge } from '../components/OrbBadge';
 import { ImagePickerModal } from '../components/ImagePickerModal';
@@ -153,9 +153,24 @@ export const ConfigPhase: React.FC<ConfigPhaseProps> = ({ dataset, onUpdateDatas
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-      {/* Elements Card */}
-      <Card title={t('config.elements.title')} className="w-full">
+    <div className="animate-in fade-in duration-500 w-full space-y-6">
+      {/* Description Card - At the very top */}
+      <Card title={t('config.description.title')} icon={FileText} className="w-full bg-white dark:bg-gray-900">
+        <div>
+          <textarea
+            id="config-case-description"
+            rows={3}
+            value={dataset.description || ''}
+            onChange={e => onUpdateDataset(prev => ({ ...prev, description: e.target.value }))}
+            placeholder={t('config.description.placeholder')}
+            className="w-full p-3 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors leading-relaxed"
+          />
+        </div>
+      </Card>
+
+      <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {/* Elements Card */}
+        <Card title={t('config.elements.title')} className="w-full">
         <div className="space-y-2.5">
           {/* Add Element Button - Alone on the first line spanning full card width */}
           <button
@@ -316,6 +331,7 @@ export const ConfigPhase: React.FC<ConfigPhaseProps> = ({ dataset, onUpdateDatas
           </div>
         </div>
       </Card>
+      </div>
 
       {/* Image Picker Modal */}
       {activePicker && (

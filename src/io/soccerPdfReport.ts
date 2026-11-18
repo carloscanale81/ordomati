@@ -20,6 +20,7 @@ import { SynergyConfig } from '../logic/types';
 import { getTeamCrestColors } from '../logic/teamColors';
 
 export interface SoccerReportOptions {
+  description?: string;
   matchData: any;
   sourceUrl: string;
   timeline: SoccerTimelineResult;
@@ -513,7 +514,10 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
     { id: 'sec-integrated', num: '3', title: isEs ? 'Análisis Integrado (Final del Partido)' : 'Integrated Analysis (Final Outcome)' },
     { id: 'sec-int-rankings', num: '3.1', title: isEs ? 'Clasificación Final y Puntuaciones Acumuladas' : 'Final Cumulative Rankings & Scores' },
     { id: 'sec-int-mvp', num: '3.2', title: isEs ? 'Cuadro de Honor (MVP General y por Equipo)' : 'Honors Board (Match & Team MVPs)' },
-    { id: 'sec-int-affinity', num: '3.3', title: isEs ? 'Matrices de Afinidad Contextual Acumulada Final' : 'Final Cumulative Affinity Matrices' }
+    { id: 'sec-int-affinity', num: '3.3', title: isEs ? 'Matrices de Afinidad Contextual Acumulada Final' : 'Final Cumulative Affinity Matrices' },
+    { id: 'sec-players', num: '4', title: isEs ? 'Fichas Detalladas de Rendimiento por Jugador' : 'Detailed Player Performance Sheets' },
+    { id: 'sec-players-home', num: '4.1', title: `${matchInfo.homeTeam} — ${isEs ? 'Fichas de Jugadores Locales' : 'Home Player Sheets'}` },
+    { id: 'sec-players-away', num: '4.2', title: `${matchInfo.awayTeam} — ${isEs ? 'Fichas de Jugadores Visitantes' : 'Away Player Sheets'}` }
   );
 
   return `<!DOCTYPE html>
@@ -896,6 +900,14 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
             ${escapeHtml(matchInfo.venue)}
           </div>
         </div>
+
+        ${options.description ? `
+        <div style="margin-top: 14px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3.5px solid #2563eb; border-radius: 6px; font-size: 8.5pt; color: #334155; line-height: 1.5; text-align: left; white-space: pre-wrap;">
+          <strong style="font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.05em; color: #2563eb; display: block; margin-bottom: 3px;">
+            ${isEs ? 'Descripción del Análisis' : 'Analysis Description'}:
+          </strong>
+          ${escapeHtml(options.description)}
+        </div>` : ''}
 
         <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 8pt; color: #64748b; word-break: break-all; text-align: left;">
           <strong>${isEs ? 'URL Fuente de Datos:' : 'Source Data URL:'}</strong><br>
@@ -1450,6 +1462,166 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
       }
     </div>
   </div>
+
+  ${(() => {
+    const renderPlayerSheet = (pScore: any, rankIdx: number, teamCrest?: string) => {
+      const p = pScore.player;
+      const fm = pScore.fullMatch || { minutesPlayed: 0, rawStats: {}, dimCumulativeScores: [] };
+      const raw = fm.rawStats || {};
+      const segs: any[] = pScore.segments || [];
+
+      return `
+        <div class="avoid-break" style="margin-bottom: 22px; padding: 14px; border: 1.5px solid #cbd5e1; border-radius: 10px; background: #ffffff;">
+          <!-- Header bar of player sheet -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              ${teamCrest ? `<img src="${teamCrest}" alt="Crest" style="width: 22px; height: 22px; object-fit: contain;">` : ''}
+              <span style="font-family: monospace; font-weight: bold; background: #f1f5f9; padding: 2px 7px; border-radius: 5px; font-size: 10pt; color: #1e293b;">
+                #${p.shirtNo || rankIdx + 1}
+              </span>
+              <span style="font-size: 12pt; font-weight: 800; color: #0f172a;">
+                ${escapeHtml(p.name)}
+              </span>
+              <span style="font-size: 8.5pt; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 700;">
+                ${escapeHtml(p.position)}
+              </span>
+              ${pScore.isMatchMvp ? `<span class="badge badge-green" style="font-size: 8pt;">MVP PARTIDO</span>` : ''}
+              ${!pScore.isMatchMvp && pScore.isMvp ? `<span class="badge badge-blue" style="font-size: 8pt;">MVP EQUIPO</span>` : ''}
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 8pt; color: #64748b; text-transform: uppercase; font-weight: 700;">Punt. MVP Acumulada:</span>
+              <span style="font-family: monospace; font-size: 12pt; font-weight: 800; color: #4338ca; margin-left: 5px;">
+                ${fmtNum(pScore.cumulativeScore, 4)}
+              </span>
+            </div>
+          </div>
+
+          <!-- Match Statistics Grid -->
+          <div style="margin-bottom: 10px;">
+            <div style="font-size: 8pt; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
+              ${isEs ? 'Indicadores Originales del Partido (Cargados)' : 'Raw Match Indicators (Loaded)'}
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 8pt; text-align: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+              <thead>
+                <tr style="background: #f1f5f9; color: #475569;">
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Min</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Rating</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Goles</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Asist</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Tiros (P/T)</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Pases (C/T)</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Acierto %</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Regates</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Aéreos</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Entradas</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Intercep</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Despejes</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Paradas</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">P. Clave</th>
+                  <th style="padding: 4px; border: 1px solid #e2e8f0;">Tarjetas</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0; font-weight: bold;">${fm.minutesPlayed || raw.minutesPlayed || 0}'</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0; font-weight: bold; color: #059669;">${raw.rating || '-'}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0; font-weight: bold; color: #d97706;">${raw.goals ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0; font-weight: bold; color: #2563eb;">${raw.assists ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0;">${raw.shotsOnTarget ?? 0} / ${raw.shotsTotal ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0;">${raw.passesAccurate ?? 0} / ${raw.passesTotal ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0;">${raw.passAccuracy ?? '-'}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0; font-weight: bold; color: #7c3aed;">${raw.dribblesWon ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0;">${raw.aerialWon ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0;">${raw.tacklesWon ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0;">${raw.interceptions ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0;">${raw.clearances ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0; color: #059669;">${raw.saves ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0; color: #9333ea;">${raw.keyPasses ?? 0}</td>
+                  <td style="padding: 4px; border: 1px solid #e2e8f0;">${raw.yellowCards ?? 0}A / ${raw.redCards ?? 0}R</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Segment Breakdown Table -->
+          <div style="margin-bottom: 10px;">
+            <div style="font-size: 8pt; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
+              ${isEs ? 'Segmentación del Partido y Puntuación por Segmento' : 'Match Segmentation & Segment Scores'}
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 8pt; text-align: left; background: #ffffff; border: 1px solid #e2e8f0;">
+              <thead>
+                <tr style="background: #f1f5f9; color: #475569;">
+                  <th style="padding: 4px 6px; border: 1px solid #e2e8f0;">Segmento</th>
+                  <th style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">Minutos</th>
+                  <th style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">Peso Relativo</th>
+                  <th style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">Estado</th>
+                  <th style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: right;">Punt. Segmento</th>
+                  <th style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: right;">Aporte Ponderado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${segs.map((seg, sIdx) => `
+                  <tr style="${seg.isActive ? '' : 'color: #94a3b8; background: #fafafa;'}">
+                    <td style="padding: 4px 6px; border: 1px solid #e2e8f0; font-weight: ${seg.isActive ? 'bold' : 'normal'};">
+                      S${sIdx + 1}: ${escapeHtml(seg.segmentName)}
+                    </td>
+                    <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">${seg.duration}'</td>
+                    <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">${seg.weightPercent}%</td>
+                    <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: center;">
+                      ${seg.isActive ? `<span style="color: #16a34a; font-weight: bold;">En campo</span>` : `<span style="color: #94a3b8;">Banquillo</span>`}
+                    </td>
+                    <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace; font-weight: bold; color: ${seg.isActive ? '#4338ca' : '#94a3b8'};">
+                      ${seg.isActive ? fmtNum(seg.segmentScore, 4) : '-'}
+                    </td>
+                    <td style="padding: 4px 6px; border: 1px solid #e2e8f0; text-align: right; font-family: monospace; font-weight: bold; color: ${seg.isActive ? '#047857' : '#94a3b8'};">
+                      ${seg.isActive ? fmtNum(seg.weightedScore, 4) : '-'}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 12 Dimensions Breakdown -->
+          <div>
+            <div style="font-size: 8pt; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
+              ${isEs ? 'Puntuación Acumulada en las 12 Dimensiones' : 'Cumulative 12-Dimensional Scores'}
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 7.5pt;">
+              ${(fm.dimCumulativeScores || []).map((dim: any) => `
+                <div style="padding: 4px 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #334155; font-weight: 600;">${escapeHtml(dim.conceptName)}:</span>
+                  <span style="font-family: monospace; font-weight: 800; color: #4338ca;">${fmtNum(dim.cumulativeVp, 3)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    return `
+      <!-- SECCIÓN 4: FICHAS DETALLADAS DE RENDIMIENTO POR JUGADOR -->
+      <div class="page page-break" id="sec-players">
+        <h2>4. ${isEs ? 'Fichas Detalladas de Rendimiento por Jugador' : 'Detailed Player Performance Sheets'}</h2>
+        <p style="font-size: 9.5pt; color: #475569; margin-bottom: 20px;">
+          ${isEs
+            ? 'Ficha técnica individual exhaustiva de cada futbolista participante en el encuentro, desglosando los indicadores estadísticos originales del partido, el aporte de cada segmento temporal y las puntuaciones dimensionales del modelo ordomático:'
+            : 'Comprehensive individual technical sheet for each participating player, detailing raw match statistics, temporal segment contributions, and multidimensional ordomatic model scores:'}
+        </p>
+
+        <div id="sec-players-home" style="margin-bottom: 24px;">
+          <h3>4.1 ${escapeHtml(matchInfo.homeTeam)} — ${isEs ? 'Fichas de Jugadores Locales' : 'Home Player Sheets'}</h3>
+          ${(integralResult?.homePlayers || []).map((p, idx) => renderPlayerSheet(p, idx, timeline.homeCrestUrl)).join('')}
+        </div>
+
+        <div id="sec-players-away" class="page-break" style="margin-top: 24px;">
+          <h3>4.2 ${escapeHtml(matchInfo.awayTeam)} — ${isEs ? 'Fichas de Jugadores Visitantes' : 'Away Player Sheets'}</h3>
+          ${(integralResult?.awayPlayers || []).map((p, idx) => renderPlayerSheet(p, idx, timeline.awayCrestUrl)).join('')}
+        </div>
+      </div>
+    `;
+  })()}
 
   <script>
     // Automatic print dialog trigger when opened in new window/tab

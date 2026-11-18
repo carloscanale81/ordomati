@@ -108,7 +108,9 @@ export const SoccerTimelineSlider: React.FC<SoccerTimelineSliderProps> = ({
                 onClick={() => {
                   const matchingSeg =
                     segments.find(s => s.startMinute === ev.minute) ||
-                    segments.find(s => s.endMinute === ev.minute);
+                    segments.find(s => s.endMinute === ev.minute) ||
+                    segments.find(s => ev.minute >= s.startMinute && ev.minute <= s.endMinute) ||
+                    (ev.minute >= totalMinutes ? segments[segments.length - 1] : undefined);
                   if (matchingSeg) onSelectSegment(matchingSeg);
                 }}
                 className="absolute -top-2.5 -translate-x-1/2 z-20 flex flex-col items-center group/marker cursor-pointer select-none"
@@ -142,10 +144,10 @@ export const SoccerTimelineSlider: React.FC<SoccerTimelineSliderProps> = ({
           })}
 
           {/* Segmented clickable blocks */}
-          <div className="relative flex h-10 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 p-0.5 border border-gray-200 dark:border-gray-700">
+          <div className="relative flex h-10 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 p-0.5 border border-gray-200 dark:border-gray-700 w-full">
             {segments.map(seg => {
               const isSelected = activeSegment?.id === seg.id;
-              const widthPct = Math.max(2.5, (seg.duration / totalMinutes) * 100);
+              const widthPct = (seg.duration / totalMinutes) * 100;
               const hasSub = Boolean(seg.subDetail) || seg.startReason?.type === 'sub' || seg.endReason?.type === 'sub';
               const hasGoal = seg.startReason?.type === 'goal' || seg.endReason?.type === 'goal';
               const hasRed = seg.startReason?.type === 'red_card' || seg.endReason?.type === 'red_card';
@@ -157,7 +159,7 @@ export const SoccerTimelineSlider: React.FC<SoccerTimelineSliderProps> = ({
                   onClick={() => onSelectSegment(seg)}
                   style={{ width: `${widthPct}%` }}
                   title={`${seg.teamName}: ${seg.label} (${seg.periodName})`}
-                  className={`relative h-full transition-all duration-150 flex items-center justify-center px-1 border-r last:border-r-0 border-white/70 dark:border-gray-900/80 cursor-pointer select-none group ${
+                  className={`relative h-full transition-all duration-150 flex items-center justify-center px-1 border-r last:border-r-0 border-white/70 dark:border-gray-900/80 cursor-pointer select-none min-w-0 flex-shrink-0 group ${
                     isSelected
                       ? team === 'home'
                         ? 'bg-blue-600 text-white font-bold shadow-xs z-10 ring-2 ring-blue-500/50'

@@ -45,11 +45,13 @@ export const serializeFlavourCase = (flavourCase: FlavourAnalysisCase): string =
   const payload: FlavourAnalysisCase = {
     version: flavourCase.version || '1.0.0',
     flavour: flavourCase.flavour,
+    ...(flavourCase.description ? { description: flavourCase.description } : {}),
     sourceUrl: flavourCase.sourceUrl ?? '',
     ...(flavourCase.matchDataJson ? { matchDataJson: flavourCase.matchDataJson } : {}),
     updatedAt: flavourCase.updatedAt || new Date().toISOString(),
     exportedAt: new Date().toISOString(),
-    ...(flavourCase.dataset ? { dataset: flavourCase.dataset } : {})
+    ...(flavourCase.dataset ? { dataset: flavourCase.dataset } : {}),
+    ...(flavourCase.soccerModelConfig ? { soccerModelConfig: flavourCase.soccerModelConfig } : {})
   };
   return JSON.stringify(payload, null, 2);
 };
@@ -80,10 +82,28 @@ export const parseFlavourCase = (rawInput: unknown, expectedFlavour: FlavourId):
     return {
       version: typeof record.version === 'string' ? record.version : '1.0.0',
       flavour: expectedFlavour,
+      ...(typeof record.description === 'string' ? { description: record.description } : {}),
       sourceUrl: record.sourceUrl,
       ...(typeof record.matchDataJson === 'string' ? { matchDataJson: record.matchDataJson } : {}),
       updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString(),
-      ...(restoredDataset ? { dataset: restoredDataset } : {})
+      ...(restoredDataset ? { dataset: restoredDataset } : {}),
+      ...(record.soccerModelConfig && typeof record.soccerModelConfig === 'object'
+        ? { soccerModelConfig: record.soccerModelConfig as any }
+        : {})
+    };
+  }
+
+  // Allow importing raw match data directly into the soccer flavour
+  if (
+    expectedFlavour === 'match-soccer-mvp' &&
+    ((record.events && Array.isArray(record.events)) || (record.home && record.away) || record.matchCentreData)
+  ) {
+    return {
+      version: '1.0.0',
+      flavour: expectedFlavour,
+      sourceUrl: typeof record.sourceUrl === 'string' ? record.sourceUrl : '',
+      matchDataJson: JSON.stringify(record, null, 2),
+      updatedAt: new Date().toISOString()
     };
   }
 
@@ -279,6 +299,13 @@ export const buildFlavourReportHtml = (
           <span class="meta-value">${sourceUrlHtml}</span>
         </div>
       </div>
+      ${flavourCase.description ? `
+      <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #f3f4f6;">
+        <span class="meta-label" style="display: block; font-size: 11px; font-weight: 600; color: #2563eb; text-transform: uppercase; margin-bottom: 4px;">
+          ${language === 'es' ? 'Descripción del Análisis' : 'Analysis Description'}
+        </span>
+        <div class="meta-value" style="color: #374151; line-height: 1.5; font-size: 13px;">${escapeHtml(flavourCase.description)}</div>
+      </div>` : ''}
     </header>
     ${datasetSectionsHtml}
   </div>

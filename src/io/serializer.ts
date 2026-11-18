@@ -145,6 +145,7 @@ export const serializeFullCase = (dataset: OrdomaticaDataset): string => {
     version: '2.0.0',
     exportedAt: new Date().toISOString(),
     dataset: {
+      description: dataset.description || '',
       elements: [...dataset.elements],
       elementImages: dataset.elementImages ? [...dataset.elementImages] : undefined,
       decimalPrecision: dataset.decimalPrecision ?? 2,
@@ -265,7 +266,15 @@ export const deserializeFullCase = (rawJsonData: any): OrdomaticaDataset => {
     ? resizeArray(rawOwa, m, 0.5)
     : resizeArray([], m, 0.5);
 
+  const description: string =
+    typeof data.description === 'string'
+      ? data.description
+      : typeof parsed.description === 'string'
+      ? parsed.description
+      : '';
+
   return {
+    description,
     elements,
     elementImages,
     characteristics,

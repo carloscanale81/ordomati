@@ -33,7 +33,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { MainNavMenu } from './components/MainNavMenu';
 import { FlavourPage } from './components/FlavourPage';
 import { FunctionSyntaxPage } from './components/FunctionSyntaxPage';
-import { AppFooter } from './components/AppFooter';
+import { AppFooter, useIsFooterVisible } from './components/AppFooter';
 import { ThemeProvider } from './theme/ThemeContext';
 import { ConfigPhase } from './phases/ConfigPhase';
 import { CharacteristicPhase } from './phases/CharacteristicPhase';
@@ -68,8 +68,10 @@ function AppContent() {
   const [pendingImportData, setPendingImportData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Main scroll container reference
+  // Main scroll container reference and footer visibility tracking
   const mainScrollRef = useRef<HTMLElement>(null);
+  const rightFooterRef = useRef<HTMLElement>(null);
+  const isRightFooterVisible = useIsFooterVisible(mainScrollRef, rightFooterRef);
   const isProgrammaticScrollRef = useRef<boolean>(false);
 
   // Pure algorithmic calculation invoked reactively
@@ -144,6 +146,19 @@ function AppContent() {
     setPendingImportData(null);
   };
 
+  // Directly Import an Example Case from the Header Menu
+  const handleImportExample = (exampleData: any) => {
+    try {
+      const restored = deserializeFullCase(exampleData);
+      setDataset(restored);
+      setActiveView('ordomachine');
+      setActivePhase(0);
+      setActiveCharIdx(0);
+    } catch (err) {
+      console.error('Error importing example case:', err);
+    }
+  };
+
   // Navigate to phase with smooth scrolling
   const scrollToPhase = (phaseIndex: number) => {
     // If target phase is collapsed, auto-expand it
@@ -203,9 +218,9 @@ function AppContent() {
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-950 text-gray-800 dark:text-gray-100 font-sans overflow-hidden transition-colors duration-200">
       {/* HEADER */}
       <header className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-between shrink-0 shadow-sm z-30 transition-colors duration-200">
-        {/* Left: Sidebar Toggle (main view), App Title & Top Menu */}
+        {/* Left: Sidebar Toggle (main view & soccer mvp flavour), App Title & Top Menu */}
         <div className="flex items-center gap-2.5">
-          {activeView === 'ordomachine' && (
+          {(activeView === 'ordomachine' || activeView === 'match-soccer-mvp') && (
             <button
               type="button"
               onClick={() => setIsSidebarOpen(prev => !prev)}
@@ -219,7 +234,11 @@ function AppContent() {
           <Activity className="w-6 h-6 text-blue-600 dark:text-blue-400 shrink-0" />
           <h1 className="text-xl font-bold tracking-tight text-gray-800 dark:text-gray-100">{t('app.title')}</h1>
 
-          <MainNavMenu activeView={activeView} onSelectView={setActiveView} />
+          <MainNavMenu
+            activeView={activeView}
+            onSelectView={setActiveView}
+            onImportExample={handleImportExample}
+          />
         </div>
 
         {/* Right: Theme Toggle & Language Switcher */}
@@ -343,6 +362,13 @@ function AppContent() {
             }`}
           >
             <div>
+              {/* Sidebar Footer Info: Appears at the TOP of the left menu if right footer is NOT visible */}
+              {!isRightFooterVisible && (
+                <div className="pb-4 mb-4 border-b border-gray-100 dark:border-gray-800 animate-in fade-in duration-200">
+                  <AppFooter variant="sidebar" />
+                </div>
+              )}
+
               {/* Case Actions (Export / Import / Generate Report) */}
               <div className="space-y-2 pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
                 <div className="grid grid-cols-2 gap-2">
@@ -366,18 +392,8 @@ function AppContent() {
                   </button>
                 </div>
 
-                {/* Actions Row: Nuevo Análisis (left) + Generar Informe (right, half-width) */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsNewAnalysisConfirmOpen(true)}
-                    title={t('header.newAnalysis')}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-300 dark:hover:border-rose-800 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer select-none"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                    <span className="truncate">{t('header.newAnalysis')}</span>
-                  </button>
-
+                {/* Actions: Generar Informe (full width) followed by Nuevo Análisis (full width) */}
+                <div className="flex flex-col gap-2">
                   <button
                     type="button"
                     onClick={handleGenerateReport}
@@ -387,7 +403,7 @@ function AppContent() {
                         ? t('header.generateReport')
                         : t('header.generateReportDisabled')
                     }
-                    className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border transition-all shadow-2xs select-none ${
+                    className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border transition-all shadow-2xs select-none ${
                       isAnalysisComplete
                         ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 cursor-pointer shadow-blue-500/20'
                         : 'bg-gray-100 dark:bg-gray-800/60 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-800 cursor-not-allowed opacity-60'
@@ -395,6 +411,16 @@ function AppContent() {
                   >
                     <FileDown className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{t('header.generateReport')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsNewAnalysisConfirmOpen(true)}
+                    title={t('header.newAnalysis')}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-300 dark:hover:border-rose-800 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer select-none"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                    <span className="truncate">{t('header.newAnalysis')}</span>
                   </button>
                 </div>
               </div>
@@ -504,26 +530,24 @@ function AppContent() {
             </section>
 
             {/* Persistent Author & Intellectual Property Footer */}
-            <AppFooter />
+            <AppFooter ref={rightFooterRef} />
           </div>
         </main>
         </div>
       )}
 
-      {/* FUNCTION SYNTAX DOCUMENTATION VIEW (FULL WIDTH, SCROLLABLE, NO LEFT SIDEBAR) */}
+      {/* FUNCTION SYNTAX DOCUMENTATION VIEW (WITH LEFT SIDEBAR FOOTER INFO) */}
       {activeView === 'function-syntax' && (
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
-          <div className="max-w-7xl mx-auto space-y-8 pb-16">
-            <FunctionSyntaxPage />
-          </div>
-        </main>
+        <FunctionSyntaxPage isSidebarOpen={isSidebarOpen} />
       )}
 
-      {/* FLAVOUR WORKSPACE VIEWS (FULL WIDTH, NO LEFT SIDEBAR) */}
+      {/* FLAVOUR WORKSPACE VIEWS */}
       {isFlavourId(activeView) && (
         <FlavourPage
           key={activeView}
           flavourCase={flavourCases[activeView]}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
           onUpdateFlavourCase={updater =>
             setFlavourCases(prev => ({
               ...prev,

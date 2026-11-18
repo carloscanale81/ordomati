@@ -12,11 +12,13 @@ import {
   FileDown,
   FileText,
   Flag,
+  Info,
   Link2,
   Loader2,
   MapPin,
   Network,
   Play,
+  RotateCcw,
   RotateCw,
   Sliders,
   SlidersHorizontal,
@@ -65,15 +67,18 @@ import { SoccerGeneralConfigPanel } from './SoccerGeneralConfigPanel';
 import { PipelineFunctionKey } from './SoccerPipelineFunctionsConfig';
 import { SoccerContextualAffinityPanel } from './SoccerContextualAffinityPanel';
 import { SoccerDimensionCard } from './SoccerDimensionCard';
+import { SoccerPhaseStepper } from './SoccerPhaseStepper';
 import { SoccerAggregateCard } from './SoccerAggregateCard';
 import { SoccerIntegralMatchAnalysis } from './SoccerIntegralMatchAnalysis';
-import { AppFooter } from './AppFooter';
+import { AppFooter, useIsFooterVisible } from './AppFooter';
 import { useI18n } from '../i18n/I18nContext';
 import { TranslationKey } from '../i18n/translations';
 
 export interface FlavourPageProps {
   flavourCase: FlavourAnalysisCase;
   onUpdateFlavourCase: (updater: (prev: FlavourAnalysisCase) => FlavourAnalysisCase) => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 const FLAVOUR_TEXT_KEYS: Record<
@@ -102,12 +107,17 @@ interface StatusNotice {
  */
 export const FlavourPage: React.FC<FlavourPageProps> = ({
   flavourCase,
-  onUpdateFlavourCase
+  onUpdateFlavourCase,
+  isSidebarOpen = true,
+  onToggleSidebar
 }) => {
   const { t, language } = useI18n();
   const urlInputId = useId();
   const jsonTextareaId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+  const rightFooterRef = useRef<HTMLElement>(null);
+  const isRightFooterVisible = useIsFooterVisible(mainScrollRef, rightFooterRef);
   const [notice, setNotice] = useState<StatusNotice | null>(null);
   const [isScraping, setIsScraping] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
@@ -116,6 +126,8 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   // Soccer MVP specific state: tabs, timeline segment, calculation status, synergy, OWA & dim affinity
   const isSoccerFlavour = flavourCase.flavour === 'match-soccer-mvp';
   const [activeSoccerTab, setActiveSoccerTab] = useState<'segments' | 'integral'>('segments');
+  const [activeSoccerPhase, setActiveSoccerPhase] = useState<number>(0);
+  const [activeConcept, setActiveConcept] = useState<SoccerConcept | null>(null);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>('');
   const [isConfigCollapsed, setIsConfigCollapsed] = useState<boolean>(false);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(false);
@@ -386,6 +398,16 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     return soccerTimeline.homeSegments[0] || soccerTimeline.awaySegments[0] || null;
   }, [soccerTimeline, selectedSegmentId]);
 
+  // Synchronize selectedSegmentId when a different match is loaded
+  useEffect(() => {
+    if (soccerTimeline?.homeSegments?.length) {
+      const allSegments = [...soccerTimeline.homeSegments, ...soccerTimeline.awaySegments];
+      if (!allSegments.some(s => s.id === selectedSegmentId)) {
+        setSelectedSegmentId(soccerTimeline.homeSegments[0]?.id || '');
+      }
+    }
+  }, [soccerTimeline]);
+
   // Compute dimensional analyses for all concepts for the active segment
   const soccerDimAnalyses: SoccerDimensionalAnalysis[] = useMemo(() => {
     if (!parsedSoccerMatchData || !activeSegment) return [];
@@ -641,7 +663,30 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   };
 
   const handleExport = () => {
-    const jsonStr = serializeFlavourCase(flavourCase);
+    let caseToExport: FlavourAnalysisCase = flavourCase;
+    if (isSoccerFlavour) {
+      caseToExport = {
+        ...flavourCase,
+        version: '1.0.0',
+        flavour: 'match-soccer-mvp',
+        sourceUrl: flavourCase.sourceUrl || '',
+        ...(flavourCase.matchDataJson ? { matchDataJson: flavourCase.matchDataJson } : {}),
+        updatedAt: new Date().toISOString(),
+        soccerModelConfig: {
+          activeSoccerTab,
+          selectedSegmentId,
+          propagationConfig: soccerPropagationConfig,
+          blockingConfig: soccerBlockingConfig,
+          synergyConfig: soccerSynergyConfig,
+          relativeConfig: soccerRelativeConfig,
+          equalizationConfig: soccerEqualizationConfig,
+          dimensionOverrides,
+          owaConfig: soccerOwaConfig,
+          dimAffinityMatrix: soccerDimAffinity
+        }
+      };
+    }
+    const jsonStr = serializeFlavourCase(caseToExport);
     const dateStr = new Date().toISOString().slice(0, 10);
     downloadJsonFile(`${definition.filePrefix}_${dateStr}.json`, jsonStr);
     setNotice({
@@ -658,6 +703,41 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
       const parsed = await readJsonFile(file);
       const restored = parseFlavourCase(parsed, flavourCase.flavour);
       onUpdateFlavourCase(() => restored);
+
+      if (isSoccerFlavour && restored.soccerModelConfig) {
+        const smc = restored.soccerModelConfig;
+        if (smc.activeSoccerTab === 'segments' || smc.activeSoccerTab === 'integral') {
+          setActiveSoccerTab(smc.activeSoccerTab);
+        }
+        if (typeof smc.selectedSegmentId === 'string') {
+          setSelectedSegmentId(smc.selectedSegmentId);
+        }
+        if (smc.propagationConfig) {
+          setSoccerPropagationConfig(smc.propagationConfig);
+        }
+        if (smc.blockingConfig) {
+          setSoccerBlockingConfig(smc.blockingConfig);
+        }
+        if (smc.synergyConfig) {
+          setSoccerSynergyConfig(smc.synergyConfig);
+        }
+        if (smc.relativeConfig) {
+          setSoccerRelativeConfig(smc.relativeConfig);
+        }
+        if (smc.equalizationConfig) {
+          setSoccerEqualizationConfig(smc.equalizationConfig);
+        }
+        if (smc.dimensionOverrides && typeof smc.dimensionOverrides === 'object') {
+          setDimensionOverrides(smc.dimensionOverrides);
+        }
+        if (smc.owaConfig && typeof smc.owaConfig === 'object') {
+          setSoccerOwaConfig(smc.owaConfig);
+        }
+        if (Array.isArray(smc.dimAffinityMatrix)) {
+          setSoccerDimAffinity(smc.dimAffinityMatrix);
+        }
+      }
+
       setNotice({
         kind: 'success',
         message: t('flavours.analysisControls.statusImported')
@@ -729,6 +809,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
       openSoccerPdfReport({
         matchData: parsedSoccerMatchData,
         sourceUrl: flavourCase.sourceUrl || DEFAULT_SOCCER_MATCH_URL,
+        description: flavourCase.description,
         timeline: soccerTimeline,
         matchInfo: {
           homeTeam: parsedSoccerMatchData?.home?.name || soccerTimeline.homeTeamName || 'España',
@@ -764,6 +845,21 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     }
   };
 
+  const handleResetSoccerMatch = () => {
+    onUpdateFlavourCase(prev => ({
+      ...prev,
+      sourceUrl: '',
+      matchDataJson: undefined,
+      updatedAt: new Date().toISOString()
+    }));
+    setActiveConcept(null);
+    setActiveSoccerPhase(0);
+    setNotice({
+      kind: 'success',
+      message: t('flavours.analysisControls.statusSourceCleared')
+    });
+  };
+
   const secondaryButtonClass =
     'h-10 inline-flex items-center justify-center gap-1.5 px-3.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/90 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer whitespace-nowrap';
 
@@ -771,45 +867,81 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     'h-10 inline-flex items-center justify-center gap-1.5 px-4 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg border border-transparent shadow-xs transition-colors cursor-pointer whitespace-nowrap';
 
   return (
-    <div className="relative flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
+    <div className="relative flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
       {/* Top-right monochrome watermark layer behind all cards */}
       <FlavourWatermark variant={definition.watermarkVariant} />
 
-      <main className="relative z-10 h-full overflow-y-auto p-4 md:p-8 scroll-smooth">
-        <div className="max-w-[1360px] mx-auto space-y-4 pb-16">
-          {/* First Card: Analysis Controls */}
-          <Card
-            title={
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <span>{t('header.menu.ordomachine')}</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/70">
-                  {t('flavours.badge')}
-                </span>
-                <span>{t(textKeys.titleKey)}</span>
-              </span>
-            }
-            icon={SlidersHorizontal}
-            className="bg-white/95 dark:bg-gray-900/95"
-          >
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              {t('flavours.analysisControls.subtitle')}
-            </p>
+      {/* LEFT VERTICAL STEPPER SIDEBAR FOR SOCCER MVP */}
+      {isSoccerFlavour && (
+        <aside
+          className={`relative z-20 transition-all duration-300 ease-in-out border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0 hidden md:flex flex-col justify-between overflow-y-auto ${
+            isSidebarOpen ? 'w-72 lg:w-80 p-5' : 'w-0 p-0 overflow-hidden border-r-0 opacity-0 pointer-events-none'
+          }`}
+        >
+          <div>
+            {/* Sidebar Footer Info: Appears at the TOP of the left menu if right footer is NOT visible */}
+            {!isRightFooterVisible && (
+              <div className="pb-4 mb-4 border-b border-gray-100 dark:border-gray-800 animate-in fade-in duration-200">
+                <AppFooter variant="sidebar" />
+              </div>
+            )}
 
-            <div>
-              <label
-                htmlFor={urlInputId}
-                className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5"
-              >
-                {t('flavours.analysisControls.sourceUrl')}
-              </label>
+            {/* Case Actions (Export / Import / Generate Report / New Match) */}
+            <div className="space-y-2 pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  title={t('flavours.analysisControls.export')}
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/90 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span className="truncate">{t('flavours.analysisControls.export')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title={t('flavours.analysisControls.import')}
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/90 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span className="truncate">{t('flavours.analysisControls.import')}</span>
+                </button>
+              </div>
 
-              <div className="flex flex-col xl:flex-row xl:items-center gap-2.5">
-                {/* Source Data URL Input + Load Button */}
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <div className="relative flex-1 min-w-0 flex items-center">
-                    <Link2 className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3 pointer-events-none" />
+              {/* Actions: Generar Informe (full width) followed by Nuevo Análisis (full width) */}
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateSoccerReport}
+                  disabled={!parsedSoccerMatchData || !soccerTimeline || isGeneratingSoccerReport}
+                  title={t('soccer.report.generatePdfButton')}
+                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border transition-all shadow-2xs select-none ${
+                    parsedSoccerMatchData && soccerTimeline && !isGeneratingSoccerReport
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 cursor-pointer shadow-blue-500/20'
+                      : 'bg-gray-100 dark:bg-gray-800/60 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-800 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {isGeneratingSoccerReport ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                  ) : (
+                    <FileDown className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span className="truncate">{t('soccer.report.generatePdfButton')}</span>
+                </button>
+
+                {/* Source Data URL Input & Load Button */}
+                <div className="space-y-1.5 pt-1">
+                  <label
+                    htmlFor="soccer-sidebar-source-url"
+                    className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400"
+                  >
+                    {t('flavours.analysisControls.sourceUrl')}
+                  </label>
+                  <div className="relative flex items-center">
+                    <Link2 className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 absolute left-2.5 pointer-events-none" />
                     <input
-                      id={urlInputId}
+                      id="soccer-sidebar-source-url"
                       type="url"
                       value={flavourCase.sourceUrl}
                       onChange={e => handleUrlChange(e.target.value)}
@@ -817,233 +949,395 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                         if (e.key === 'Enter') handleLoadUrl();
                       }}
                       placeholder={t(textKeys.placeholderKey)}
-                      className="w-full h-10 pl-9 pr-9 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+                      className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
                     />
                     {flavourCase.sourceUrl && (
                       <button
                         type="button"
                         onClick={() => handleUrlChange('')}
                         title={t('flavours.analysisControls.clearUrl')}
-                        aria-label={t('flavours.analysisControls.clearUrl')}
-                        className="absolute right-2 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                        className="absolute right-2 p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3 h-3" />
                       </button>
                     )}
                   </div>
-
                   <button
                     type="button"
                     onClick={handleLoadUrl}
                     disabled={isScraping}
-                    className={`${secondaryButtonClass} shrink-0 disabled:opacity-60 disabled:cursor-not-allowed`}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg shadow-2xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {isScraping ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <ArrowDownToLine className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <ArrowDownToLine className="w-3.5 h-3.5" />
                     )}
                     <span>{isScraping ? t('flavours.analysisControls.loading') : t('flavours.analysisControls.load')}</span>
                   </button>
                 </div>
-
-                {!isSoccerFlavour && (
-                  <>
-                    <div className="hidden xl:block h-7 w-px bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />
-
-                    {/* Action Buttons: Run, Export, Import & Generate Report */}
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={handleExecute}
-                        className={primaryButtonClass}
-                      >
-                        <RotateCw className="w-4 h-4" />
-                        <span>{t('flavours.analysisControls.run')}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleExport}
-                        className={secondaryButtonClass}
-                      >
-                        <Download className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        <span>{t('flavours.analysisControls.export')}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className={secondaryButtonClass}
-                      >
-                        <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        <span>{t('flavours.analysisControls.import')}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleGenerateReport}
-                        className={secondaryButtonClass}
-                      >
-                        <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        <span>{t('flavours.analysisControls.generateReport')}</span>
-                      </button>
-                    </div>
-                  </>
-                )}
               </div>
+            </div>
 
-              <p className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-                {t('flavours.analysisControls.sourceUrlHelp')}
-              </p>
+            {/* Stepper Navigation (only shown once match data is loaded) */}
+            {parsedSoccerMatchData && soccerTimeline && (
+              <SoccerPhaseStepper
+                activePhase={activeSoccerPhase}
+                onSelectPhase={phaseIdx => {
+                  setActiveSoccerPhase(phaseIdx);
+                  if (phaseIdx === 0) {
+                    document.getElementById('soccer-section-config')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  } else if (phaseIdx === 1) {
+                    setActiveSoccerTab('segments');
+                    setTimeout(() => {
+                      document.getElementById('soccer-section-segments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 60);
+                  } else if (phaseIdx === 2) {
+                    setActiveSoccerTab('integral');
+                    setTimeout(() => {
+                      document.getElementById('soccer-section-integral')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 60);
+                  }
+                }}
+                analyses={soccerDimAnalyses}
+                activeConcept={activeConcept}
+                onSelectConcept={concept => {
+                  setActiveConcept(concept);
+                  setActiveSoccerPhase(1);
+                  setActiveSoccerTab('segments');
+                  const scrollToTarget = () => {
+                    const el = document.getElementById(`soccer-dim-${concept}`);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      return true;
+                    }
+                    return false;
+                  };
+                  if (!scrollToTarget()) {
+                    setTimeout(scrollToTarget, 60);
+                    setTimeout(scrollToTarget, 180);
+                  }
+                }}
+              />
+            )}
+          </div>
+        </aside>
+      )}
 
-              {/* Match Metadata Integrated Strip (Only for Soccer MVP flavour when match data is present) */}
-              {isSoccerFlavour && parsedSoccerMatchData && (
-                <div className="mt-3.5 p-3 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 flex flex-wrap items-center justify-between gap-3 text-xs">
-                  {/* Teams & Score */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 font-bold text-gray-900 dark:text-gray-100">
-                      {soccerTimeline?.homeCrestUrl && (
-                        <img
-                          src={soccerTimeline.homeCrestUrl}
-                          alt={soccerTimeline.homeTeamName}
-                          className="w-5 h-5 object-contain"
+      {/* RIGHT MAIN SCROLLABLE CONTAINER */}
+      <main ref={mainScrollRef} className="relative z-10 flex-1 h-full overflow-y-auto p-4 md:p-8 scroll-smooth">
+        <div className="max-w-[1360px] mx-auto space-y-4 pb-16">
+          {/* First Card: Analysis Controls */}
+          <div id="soccer-section-config" className="scroll-mt-6">
+            <Card
+              title={
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span>{t('header.menu.ordomachine')}</span>
+                  <span>{t(textKeys.titleKey)}</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/70">
+                    {t('flavours.badge')}
+                  </span>
+                </span>
+              }
+              icon={SlidersHorizontal}
+              className="bg-white/95 dark:bg-gray-900/95"
+            >
+              {isSoccerFlavour ? (
+                <>
+                  {!parsedSoccerMatchData || !soccerTimeline ? (
+                    /* Bounded dashed box like in Phase 2 & 3 of main ordomachine when no data is loaded */
+                    <div className="w-full py-12 px-6 rounded-2xl bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 text-center space-y-2">
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        {t('soccer.emptyState.heading')}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {t('soccer.emptyState.description')}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Match Metadata Integrated Strip (Only for Soccer MVP flavour when match data is present) */}
+                      <div className="p-3 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        {/* Teams & Score */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5 font-bold text-gray-900 dark:text-gray-100">
+                            {soccerTimeline?.homeCrestUrl && (
+                              <img
+                                src={soccerTimeline.homeCrestUrl}
+                                alt={soccerTimeline.homeTeamName}
+                                className="w-5 h-5 object-contain"
+                              />
+                            )}
+                            <span>{parsedSoccerMatchData?.home?.name || 'España'}</span>
+                          </div>
+
+                          <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-2xs">
+                            {parsedSoccerMatchData?.score || '3 : 2 (AET)'}
+                          </span>
+
+                          <div className="flex items-center gap-1.5 font-bold text-gray-900 dark:text-gray-100">
+                            {soccerTimeline?.awayCrestUrl && (
+                              <img
+                                src={soccerTimeline.awayCrestUrl}
+                                alt={soccerTimeline.awayTeamName}
+                                className="w-5 h-5 object-contain"
+                              />
+                            )}
+                            <span>{parsedSoccerMatchData?.away?.name || 'Argentina'}</span>
+                          </div>
+                        </div>
+
+                        {/* Competition, Stage, Date, Venue */}
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-600 dark:text-gray-400">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-300">
+                            <Trophy className="w-3 h-3 text-amber-500" />
+                            <span>{displayCompetition}</span>
+                          </span>
+
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-300">
+                            <Flag className="w-3 h-3 text-blue-500" />
+                            <span>{displayStage}</span>
+                          </span>
+
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                            <Calendar className="w-3 h-3 text-gray-400" />
+                            <span>{formattedMatchDate}</span>
+                          </span>
+
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                            <MapPin className="w-3 h-3 text-gray-400" />
+                            <span>{displayVenue}</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Analysis Description Field */}
+                      <div className="mt-3 space-y-2">
+                        <label
+                          htmlFor="soccer-analysis-description"
+                          className="block text-xs font-semibold text-gray-700 dark:text-gray-300"
+                        >
+                          {t('soccer.description.label')}
+                        </label>
+                        <textarea
+                          id="soccer-analysis-description"
+                          rows={2}
+                          value={flavourCase.description || ''}
+                          onChange={e =>
+                            onUpdateFlavourCase(prev => ({
+                              ...prev,
+                              description: e.target.value,
+                              updatedAt: new Date().toISOString()
+                            }))
+                          }
+                          placeholder={t('soccer.description.placeholder')}
+                          className="w-full p-2.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/60 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors leading-relaxed"
                         />
-                      )}
-                      <span>{parsedSoccerMatchData?.home?.name || 'España'}</span>
+                        {/* Notice Box: Statistical data as contextual values, eigenvalues for aggregation and ranking */}
+                        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 text-blue-900 dark:text-blue-200 shadow-2xs">
+                          <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                          <p className="text-xs leading-relaxed font-normal">
+                            {t('soccer.description.contextualNote')}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Extracted Match Data JSON String Field (Collapsible Debug Panel) */}
+                      <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsJsonExpanded(prev => !prev)}
+                            title={
+                              isJsonExpanded
+                                ? t('flavours.analysisControls.collapseDebugJson')
+                                : t('flavours.analysisControls.expandDebugJson')
+                            }
+                            aria-label={
+                              isJsonExpanded
+                                ? t('flavours.analysisControls.collapseDebugJson')
+                                : t('flavours.analysisControls.expandDebugJson')
+                            }
+                            aria-expanded={isJsonExpanded}
+                            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer select-none"
+                          >
+                            {isJsonExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            )}
+                            <Code2 className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                            <span>{t('flavours.analysisControls.debugJsonTitle')}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+                              {t('flavours.analysisControls.debugBadge')}
+                            </span>
+                            {jsonSummary ? (
+                              <span className="text-[11px] font-normal text-gray-400 dark:text-gray-500">
+                                (
+                                {jsonSummary.events && jsonSummary.players
+                                  ? t('flavours.analysisControls.matchJsonStatsFull', {
+                                      chars: jsonSummary.chars,
+                                      events: jsonSummary.events,
+                                      players: jsonSummary.players
+                                    })
+                                  : t('flavours.analysisControls.matchJsonStats', {
+                                      chars: jsonSummary.chars
+                                    })}
+                                )
+                              </span>
+                            ) : null}
+                          </button>
+
+                          {isJsonExpanded && flavourCase.matchDataJson ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCopyJson}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>
+                                  {isCopied
+                                    ? t('flavours.analysisControls.statusJsonCopied')
+                                    : t('flavours.analysisControls.copyJson')}
+                                </span>
+                              </button>
+                              <span className="text-gray-300 dark:text-gray-700">·</span>
+                              <button
+                                type="button"
+                                onClick={() => handleJsonChange('')}
+                                className="text-xs font-semibold text-gray-500 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
+                              >
+                                {t('flavours.analysisControls.clearJson')}
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {isJsonExpanded && (
+                          <div className="mt-2.5 space-y-1.5 animate-in fade-in-50 duration-200">
+                            <textarea
+                              id={jsonTextareaId}
+                              rows={8}
+                              value={flavourCase.matchDataJson || ''}
+                              onChange={e => handleJsonChange(e.target.value)}
+                              placeholder={t('flavours.analysisControls.matchJsonPlaceholder')}
+                              className="w-full p-3 font-mono text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-400 transition-colors leading-relaxed"
+                              spellCheck={false}
+                            />
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                              {t('flavours.analysisControls.matchJsonHelp')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                /* Non-Soccer flavours */
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                    {t('flavours.analysisControls.subtitle')}
+                  </p>
+                  <div>
+                    <label
+                      htmlFor={urlInputId}
+                      className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5"
+                    >
+                      {t('flavours.analysisControls.sourceUrl')}
+                    </label>
+
+                    <div className="flex flex-col xl:flex-row xl:items-center gap-2.5">
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <div className="relative flex-1 min-w-0 flex items-center">
+                          <Link2 className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3 pointer-events-none" />
+                          <input
+                            id={urlInputId}
+                            type="url"
+                            value={flavourCase.sourceUrl}
+                            onChange={e => handleUrlChange(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleLoadUrl();
+                            }}
+                            placeholder={t(textKeys.placeholderKey)}
+                            className="w-full h-10 pl-9 pr-9 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+                          />
+                          {flavourCase.sourceUrl && (
+                            <button
+                              type="button"
+                              onClick={() => handleUrlChange('')}
+                              title={t('flavours.analysisControls.clearUrl')}
+                              aria-label={t('flavours.analysisControls.clearUrl')}
+                              className="absolute right-2 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleLoadUrl}
+                          disabled={isScraping}
+                          className={`${secondaryButtonClass} shrink-0 disabled:opacity-60 disabled:cursor-not-allowed`}
+                        >
+                          {isScraping ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                          ) : (
+                            <ArrowDownToLine className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          )}
+                          <span>{isScraping ? t('flavours.analysisControls.loading') : t('flavours.analysisControls.load')}</span>
+                        </button>
+                      </div>
+
+                      <div className="hidden xl:block h-7 w-px bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />
+
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleExecute}
+                          className={primaryButtonClass}
+                        >
+                          <RotateCw className="w-4 h-4" />
+                          <span>{t('flavours.analysisControls.run')}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleExport}
+                          className={secondaryButtonClass}
+                        >
+                          <Download className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <span>{t('flavours.analysisControls.export')}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className={secondaryButtonClass}
+                        >
+                          <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <span>{t('flavours.analysisControls.import')}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleGenerateReport}
+                          className={secondaryButtonClass}
+                        >
+                          <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <span>{t('flavours.analysisControls.generateReport')}</span>
+                        </button>
+                      </div>
                     </div>
 
-                    <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-2xs">
-                      {parsedSoccerMatchData?.score || '3 : 2 (AET)'}
-                    </span>
-
-                    <div className="flex items-center gap-1.5 font-bold text-gray-900 dark:text-gray-100">
-                      {soccerTimeline?.awayCrestUrl && (
-                        <img
-                          src={soccerTimeline.awayCrestUrl}
-                          alt={soccerTimeline.awayTeamName}
-                          className="w-5 h-5 object-contain"
-                        />
-                      )}
-                      <span>{parsedSoccerMatchData?.away?.name || 'Argentina'}</span>
-                    </div>
-                  </div>
-
-                  {/* Competition, Stage, Date, Venue */}
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-600 dark:text-gray-400">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-300">
-                      <Trophy className="w-3 h-3 text-amber-500" />
-                      <span>{displayCompetition}</span>
-                    </span>
-
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-300">
-                      <Flag className="w-3 h-3 text-blue-500" />
-                      <span>{displayStage}</span>
-                    </span>
-
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                      <Calendar className="w-3 h-3 text-gray-400" />
-                      <span>{formattedMatchDate}</span>
-                    </span>
-
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                      <MapPin className="w-3 h-3 text-gray-400" />
-                      <span>{displayVenue}</span>
-                    </span>
+                    <p className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                      {t('flavours.analysisControls.sourceUrlHelp')}
+                    </p>
                   </div>
                 </div>
               )}
-
-              {/* Extracted Match Data JSON String Field (Collapsible Debug Panel) */}
-              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsJsonExpanded(prev => !prev)}
-                    title={
-                      isJsonExpanded
-                        ? t('flavours.analysisControls.collapseDebugJson')
-                        : t('flavours.analysisControls.expandDebugJson')
-                    }
-                    aria-label={
-                      isJsonExpanded
-                        ? t('flavours.analysisControls.collapseDebugJson')
-                        : t('flavours.analysisControls.expandDebugJson')
-                    }
-                    aria-expanded={isJsonExpanded}
-                    className="inline-flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer select-none"
-                  >
-                    {isJsonExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                    )}
-                    <Code2 className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
-                    <span>{t('flavours.analysisControls.debugJsonTitle')}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
-                      {t('flavours.analysisControls.debugBadge')}
-                    </span>
-                    {jsonSummary ? (
-                      <span className="text-[11px] font-normal text-gray-400 dark:text-gray-500">
-                        (
-                        {jsonSummary.events && jsonSummary.players
-                          ? t('flavours.analysisControls.matchJsonStatsFull', {
-                              chars: jsonSummary.chars,
-                              events: jsonSummary.events,
-                              players: jsonSummary.players
-                            })
-                          : t('flavours.analysisControls.matchJsonStats', {
-                              chars: jsonSummary.chars
-                            })}
-                        )
-                      </span>
-                    ) : null}
-                  </button>
-
-                  {isJsonExpanded && flavourCase.matchDataJson ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCopyJson}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>
-                          {isCopied
-                            ? t('flavours.analysisControls.statusJsonCopied')
-                            : t('flavours.analysisControls.copyJson')}
-                        </span>
-                      </button>
-                      <span className="text-gray-300 dark:text-gray-700">·</span>
-                      <button
-                        type="button"
-                        onClick={() => handleJsonChange('')}
-                        className="text-xs font-semibold text-gray-500 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
-                      >
-                        {t('flavours.analysisControls.clearJson')}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-
-                {isJsonExpanded && (
-                  <div className="mt-2.5 space-y-1.5 animate-in fade-in-50 duration-200">
-                    <textarea
-                      id={jsonTextareaId}
-                      rows={8}
-                      value={flavourCase.matchDataJson || ''}
-                      onChange={e => handleJsonChange(e.target.value)}
-                      placeholder={t('flavours.analysisControls.matchJsonPlaceholder')}
-                      className="w-full p-3 font-mono text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 dark:focus:border-blue-400 transition-colors leading-relaxed"
-                      spellCheck={false}
-                    />
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      {t('flavours.analysisControls.matchJsonHelp')}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
 
             <input
               type="file"
@@ -1080,6 +1374,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
               </div>
             )}
           </Card>
+          </div>
 
           {/* Soccer Flavour Analysis Container (rendered once match data is loaded) */}
           {isSoccerFlavour && parsedSoccerMatchData && (
@@ -1131,8 +1426,8 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                 </Card>
               )}
 
-              {/* 2. Barra de Agrupador de Pestañas (Análisis Segmentado / Análisis Integrado + Botón Generar Informe) */}
-              <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-blue-600/80 dark:border-blue-500/80 px-2 pt-2 -mb-2">
+              {/* 2. Barra de Agrupador de Pestañas (Análisis Segmentado / Análisis Integrado) */}
+              <div id="soccer-section-segments" className="scroll-mt-6 flex flex-wrap items-end justify-between gap-3 border-b-2 border-blue-600/80 dark:border-blue-500/80 px-2 pt-2 -mb-2">
                 <div className="flex items-end gap-1.5 -mb-[2px]">
                   <button
                     type="button"
@@ -1158,24 +1453,6 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                   >
                     <Sparkles className="w-4 h-4" />
                     <span>{t('soccer.tabs.integralAnalysis')}</span>
-                  </button>
-                </div>
-
-                {/* Botón Generar Informe en el espacio libre del lado derecho */}
-                <div className="pb-2">
-                  <button
-                    type="button"
-                    onClick={handleGenerateSoccerReport}
-                    disabled={isGeneratingSoccerReport}
-                    className="h-9 inline-flex items-center justify-center gap-2 px-4 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed select-none"
-                    title={t('soccer.report.generatePdfButton')}
-                  >
-                    {isGeneratingSoccerReport ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <FileDown className="w-4 h-4" />
-                    )}
-                    <span>{t('soccer.report.generatePdfButton')}</span>
                   </button>
                 </div>
               </div>
@@ -1263,41 +1540,53 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                   )}
 
                   {/* 12 Dimension Cards */}
-                  {soccerDimAnalyses.map(analysis => (
-                    <SoccerDimensionCard
-                      key={analysis.concept}
-                      concept={analysis.concept}
-                      conceptTitle={analysis.conceptName}
-                      analysis={analysis}
-                      segment={activeSegment || undefined}
-                      crestUrl={activeSegment?.team === 'home' ? soccerTimeline?.homeCrestUrl : soccerTimeline?.awayCrestUrl}
-                      overrideFlags={dimensionOverrides[analysis.concept]}
-                      onToggleOverride={(fnKey, enabled) =>
-                        handleToggleDimensionOverride(analysis.concept, fnKey, enabled)
-                      }
-                      propagationConfig={soccerPropagationConfigs[analysis.concept] || { type: 'maxRatio' }}
-                      onUpdatePropagation={next => {
-                        setSoccerPropagationConfigs(prev => ({ ...prev, [analysis.concept]: next }));
-                      }}
-                      blockingConfig={soccerBlockingConfigs[analysis.concept] || { type: 'none' }}
-                      onUpdateBlocking={next => {
-                        setSoccerBlockingConfigs(prev => ({ ...prev, [analysis.concept]: next }));
-                      }}
-                      synergyConfig={soccerSynergyConfigs[analysis.concept] || { type: 'none', k: 1.0 }}
-                      onUpdateSynergy={next => {
-                        setSoccerSynergyConfigs(prev => ({ ...prev, [analysis.concept]: next }));
-                      }}
-                      relativeConfig={soccerRelativeConfigs[analysis.concept] || { type: 'none' }}
-                      onUpdateRelativeAdjustment={next => {
-                        setSoccerRelativeConfigs(prev => ({ ...prev, [analysis.concept]: next }));
-                      }}
-                      equalizationConfig={soccerEqualizationConfigs[analysis.concept] || { type: 'max' }}
-                      onUpdateEqualization={next => {
-                        setSoccerEqualizationConfigs(prev => ({ ...prev, [analysis.concept]: next }));
-                      }}
-                      onRecalculate={handleExecute}
-                    />
-                  ))}
+                  {soccerDimAnalyses.map(analysis => {
+                    const isActive = activeConcept === analysis.concept;
+                    return (
+                      <div
+                        key={analysis.concept}
+                        id={`soccer-dim-${analysis.concept}`}
+                        className={`scroll-mt-6 rounded-2xl transition-all duration-300 ${
+                          isActive
+                            ? 'ring-2 ring-blue-500/80 shadow-md ring-offset-2 dark:ring-offset-gray-900'
+                            : ''
+                        }`}
+                      >
+                        <SoccerDimensionCard
+                          concept={analysis.concept}
+                          conceptTitle={analysis.conceptName}
+                          analysis={analysis}
+                          segment={activeSegment || undefined}
+                          crestUrl={activeSegment?.team === 'home' ? soccerTimeline?.homeCrestUrl : soccerTimeline?.awayCrestUrl}
+                          overrideFlags={dimensionOverrides[analysis.concept]}
+                          onToggleOverride={(fnKey, enabled) =>
+                            handleToggleDimensionOverride(analysis.concept, fnKey, enabled)
+                          }
+                          propagationConfig={soccerPropagationConfigs[analysis.concept] || { type: 'maxRatio' }}
+                          onUpdatePropagation={next => {
+                            setSoccerPropagationConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                          }}
+                          blockingConfig={soccerBlockingConfigs[analysis.concept] || { type: 'none' }}
+                          onUpdateBlocking={next => {
+                            setSoccerBlockingConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                          }}
+                          synergyConfig={soccerSynergyConfigs[analysis.concept] || { type: 'none', k: 1.0 }}
+                          onUpdateSynergy={next => {
+                            setSoccerSynergyConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                          }}
+                          relativeConfig={soccerRelativeConfigs[analysis.concept] || { type: 'none' }}
+                          onUpdateRelativeAdjustment={next => {
+                            setSoccerRelativeConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                          }}
+                          equalizationConfig={soccerEqualizationConfigs[analysis.concept] || { type: 'max' }}
+                          onUpdateEqualization={next => {
+                            setSoccerEqualizationConfigs(prev => ({ ...prev, [analysis.concept]: next }));
+                          }}
+                          onRecalculate={handleExecute}
+                        />
+                      </div>
+                    );
+                  })}
 
                   {/* Aggregated Analysis Card (Ranking & Scores) */}
                   {soccerAggAnalysis && (
@@ -1310,23 +1599,25 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
 
               {/* Contenido Pestaña 2: Análisis Integral del Partido */}
               {activeSoccerTab === 'integral' && soccerTimeline && (
-                <SoccerIntegralMatchAnalysis
-                  timeline={soccerTimeline}
-                  matchData={parsedSoccerMatchData}
-                  owaConfig={soccerOwaConfig}
-                  dimAffinityMatrix={soccerDimAffinity}
-                  synergyConfigs={soccerSynergyConfigs}
-                  propagationConfig={soccerPropagationConfig}
-                  blockingConfig={soccerBlockingConfig}
-                  relativeConfig={soccerRelativeConfig}
-                  equalizationConfig={soccerEqualizationConfig}
-                />
+                <div id="soccer-section-integral" className="scroll-mt-6">
+                  <SoccerIntegralMatchAnalysis
+                    timeline={soccerTimeline}
+                    matchData={parsedSoccerMatchData}
+                    owaConfig={soccerOwaConfig}
+                    dimAffinityMatrix={soccerDimAffinity}
+                    synergyConfigs={soccerSynergyConfigs}
+                    propagationConfig={soccerPropagationConfig}
+                    blockingConfig={soccerBlockingConfig}
+                    relativeConfig={soccerRelativeConfig}
+                    equalizationConfig={soccerEqualizationConfig}
+                  />
+                </div>
               )}
             </div>
           )}
 
           {/* Persistent Author & Intellectual Property Footer */}
-          <AppFooter />
+          <AppFooter ref={rightFooterRef} />
         </div>
       </main>
     </div>
