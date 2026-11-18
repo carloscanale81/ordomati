@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Code2, Cpu, FileText, FolderOpen } from 'lucide-react';
+import { Check, ChevronDown, Code2, Cpu, FileText } from 'lucide-react';
 import { AppMenuView, FLAVOUR_LIST, FlavourId, isFlavourId } from '../../logic/flavours';
 import { FlavourIllustration } from './FlavourWatermark';
 import { getCaseExamples, getAllFlavourExamples, extractExampleDescription } from '../../logic/examples';
@@ -215,7 +215,7 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
           <div
             role="menu"
             aria-label={t('header.menu.examples')}
-            className="absolute left-0 top-full pt-1.5 w-88 z-50 animate-in fade-in duration-150"
+            className="absolute left-0 top-full pt-1.5 w-72 z-50 animate-in fade-in duration-150"
           >
             {/* Invisible bridge to prevent accidental mouseleave across the vertical gap */}
             <div className="absolute -top-3 left-0 right-0 h-3" aria-hidden="true" />
@@ -231,7 +231,13 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
                       : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-800/75'
                   }`}
                 >
-                  <Cpu className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <Cpu
+                    className={`w-4 h-4 shrink-0 ${
+                      isOrdomachineActive
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold leading-tight">{t('header.menu.ordomachine')}</div>
                     <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
@@ -244,13 +250,10 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
                 </button>
 
                 <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
-                  <FolderOpen className="w-3 h-3 text-amber-500" />
-                  <span>{t('header.menu.examples')}</span>
-                </div>
 
                 {caseExamples.map(example => {
                   const desc = example.description || extractExampleDescription(example.data);
+                  const cleanName = example.fileName.replace(/\.json$/i, '');
                   return (
                     <button
                       key={example.id}
@@ -265,17 +268,12 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
                         onSelectView('ordomachine');
                       }}
                       className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-gray-700 dark:text-gray-200 hover:bg-amber-50/80 dark:hover:bg-amber-950/30 hover:text-amber-800 dark:hover:text-amber-300 transition-colors cursor-pointer group"
-                      title={desc ? `${example.fileName} - ${desc}` : `Importar ${example.fileName}`}
+                      title={desc ? `${example.fileName}\n${desc}` : example.fileName}
                     >
                       <FileText className="w-4 h-4 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <div className="text-xs font-mono font-semibold truncate leading-tight group-hover:underline">
-                            {example.fileName}
-                          </div>
-                          <span className="text-[9px] uppercase px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-mono font-bold shrink-0">
-                            JSON
-                          </span>
+                        <div className="text-xs font-mono font-semibold truncate leading-tight group-hover:underline">
+                          {cleanName}
                         </div>
                         {desc && (
                           <div
@@ -336,7 +334,7 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
           <div
             role="menu"
             aria-label={t('header.menu.flavours')}
-            className="absolute left-0 top-full pt-1.5 w-88 z-50 animate-in fade-in duration-150"
+            className="absolute left-0 top-full pt-1.5 w-72 z-50 animate-in fade-in duration-150"
           >
             {/* Invisible bridge to prevent accidental mouseleave across the vertical gap */}
             <div className="absolute -top-3 left-0 right-0 h-3" aria-hidden="true" />
@@ -382,13 +380,11 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
 
                       {/* Submenu of examples hanging directly from this Ordoexperto menuitem */}
                       {exs.length > 0 && (
-                        <div className="ml-3 pl-3 border-l-2 border-amber-200/60 dark:border-amber-800/40 space-y-0.5 pt-0.5 pb-1">
-                          <div className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                            <FolderOpen className="w-3 h-3 text-amber-500" />
-                            <span>{t('header.menu.examples')}</span>
-                          </div>
+                        <div className="space-y-0.5">
+                          <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
                           {exs.map(example => {
                             const desc = example.description || extractExampleDescription(example.data);
+                            const cleanName = example.fileName.replace(/\.json$/i, '');
                             return (
                               <button
                                 key={example.id}
@@ -402,18 +398,13 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
                                   onImportFlavourExample?.(flavour.id, example.data);
                                   onSelectView(flavour.id);
                                 }}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-gray-700 dark:text-gray-200 hover:bg-amber-50/80 dark:hover:bg-amber-950/30 hover:text-amber-800 dark:hover:text-amber-300 transition-colors cursor-pointer group"
-                                title={desc ? `${example.fileName} - ${desc}` : `Importar ejemplo: ${example.fileName}`}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-gray-700 dark:text-gray-200 hover:bg-amber-50/80 dark:hover:bg-amber-950/30 hover:text-amber-800 dark:hover:text-amber-300 transition-colors cursor-pointer group"
+                                title={desc ? `${example.fileName}\n${desc}` : example.fileName}
                               >
-                                <FileText className="w-3.5 h-3.5 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
+                                <FileText className="w-4 h-4 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-1.5">
-                                    <span className="text-[11px] font-mono font-medium truncate leading-tight group-hover:underline">
-                                      {example.fileName}
-                                    </span>
-                                    <span className="text-[9px] uppercase px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-mono font-bold shrink-0">
-                                      JSON
-                                    </span>
+                                  <div className="text-xs font-mono font-semibold truncate leading-tight group-hover:underline">
+                                    {cleanName}
                                   </div>
                                   {desc && (
                                     <div
