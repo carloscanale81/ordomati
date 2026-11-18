@@ -31,6 +31,7 @@ export interface BlockingConfig {
   type: BlockingType;
   threshold?: number; // Threshold for threshold-based blocking (e.g. theta = 0.15)
   customExpr?: string; // Mathematical expression f(a, S, vb, theta, i, j)
+  vb?: number; // Uniform blocking factor vb in [0, 1] when scalar
 }
 
 export type SynergyType = 'none' | 'factor' | 'custom';

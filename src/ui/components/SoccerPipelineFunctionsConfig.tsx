@@ -121,6 +121,90 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
     }
   }
 
+  // --- Formula Code Helpers reflecting complete mathematical representations (including diagonal) ---
+  const getPropagationFormula = (cfg: SoccerPropagationConfig) => {
+    switch (cfg.type) {
+      case 'inhibited':
+        return 'i == j ? 1 : 0';
+      case 'triangular':
+        return 'i == j ? 1 : (d <= L ? (L - d) / L : 0)';
+      case 'rectangular':
+        return 'i == j ? 1 : (d <= L ? 1 : 0)';
+      case 'trapezoidal':
+        return 'i == j ? 1 : (d <= L1 ? 1 : (d <= L ? (L - d) / (L - L1) : 0))';
+      case 'sinusoidal':
+        return 'i == j ? 1 : (d <= L ? 0.5 * (1 + cos(pi * d / L)) : 0)';
+      case 'custom': {
+        const expr = cfg.customExpr || 'exp(-d / 2)';
+        return expr.includes('i == j') || expr.includes('i==j') ? expr : `i == j ? 1 : (${expr})`;
+      }
+      case 'maxRatio':
+      default:
+        return 'i == j ? 1 : (L > 0 ? d / L : 0)';
+    }
+  };
+
+  const getBlockingFormula = (cfg: SoccerBlockingConfig) => {
+    switch (cfg.type) {
+      case 'standard':
+        return 'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))';
+      case 'threshold':
+        return 'i == j ? 1 : (a < theta ? 0 : a)';
+      case 'custom':
+        return cfg.customExpr || 'i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))';
+      case 'none':
+      default:
+        return 'a';
+    }
+  };
+
+  const getSynergyFormula = (cfg?: SynergyConfig) => {
+    switch (cfg?.type) {
+      case 'factor':
+        return 'i == j ? a : a * k';
+      case 'custom': {
+        const expr = cfg.customExpr || 'min(1, a * 1.2)';
+        return expr.includes('i == j') || expr.includes('i==j') ? expr : `i == j ? a : (${expr})`;
+      }
+      case 'none':
+      default:
+        return 'a';
+    }
+  };
+
+  const getRelativeFormula = (cfg: SoccerRelativeAdjustmentConfig) => {
+    switch (cfg.type) {
+      case 'byMinutes':
+        return 'minutos / minutos_totales';
+      case 'byTouches':
+        return 'media_toques / toques';
+      case 'byMean':
+        return '1 / media_vc';
+      case 'custom':
+        return cfg.customExpr || '1';
+      case 'none':
+      default:
+        return '1';
+    }
+  };
+
+  const getEqualizationFormula = (cfg: SoccerEqualizationConfig) => {
+    switch (cfg.type) {
+      case 'max':
+      case 'maximum':
+        return 'min(1, vcr / max_vcr)';
+      case 'sum':
+        return 'vcr / sum_vcr';
+      case 'target':
+        return 'min(1, vcr / obj)';
+      case 'custom':
+        return cfg.customExpr || 'min(1, vcr / max_vcr)';
+      case 'none':
+      default:
+        return 'vcr';
+    }
+  };
+
   return (
     <div
       ref={containerRef}
@@ -157,37 +241,84 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
               className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer font-medium disabled:cursor-not-allowed"
             >
               <option value="maxRatio">{t('soccer.affinity.propagationTypeMaxRatio')}</option>
-              <option value="triangular">{t('soccer.affinity.propagationTypeTriangular')}</option>
-              <option value="rectangular">{t('soccer.affinity.propagationTypeRectangular')}</option>
-              <option value="sinusoidal">{t('soccer.affinity.propagationTypeSinusoidal')}</option>
-              <option value="inhibited">{t('soccer.affinity.propagationTypeInhibited')}</option>
-              <option value="custom">{t('soccer.affinity.propagationTypeCustom')}</option>
+              <option value="triangular">{t('char.tower.prop.triangular')}</option>
+              <option value="rectangular">{t('char.tower.prop.rectangular')}</option>
+              <option value="trapezoidal">{t('char.tower.prop.trapezoidal')}</option>
+              <option value="sinusoidal">{t('char.tower.prop.sinusoidal')}</option>
+              <option value="inhibited">{t('char.tower.prop.inhibited')}</option>
+              <option value="custom">{t('char.tower.prop.custom') || 'Personalizada'}</option>
             </select>
 
             <FormulaCodeDisplay
-              code={
-                propagationConfig.type === 'triangular'
-                  ? 'max(0, (L - d) / L)'
-                  : propagationConfig.type === 'rectangular'
-                  ? 'd >= cut ? 1 : 0'
-                  : propagationConfig.type === 'sinusoidal'
-                  ? 'd <= L ? 0.5 * (1 + cos(pi * d / L)) : 0'
-                  : propagationConfig.type === 'inhibited'
-                  ? '0'
-                  : propagationConfig.type === 'custom'
-                  ? propagationConfig.customExpr || 'd / L'
-                  : 'd / L'
-              }
+              code={getPropagationFormula(propagationConfig)}
               compact
             />
 
+            {/* Trapezoidal parameters: L1 and L2 */}
+            {propagationConfig.type === 'trapezoidal' && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5">
+                    {t('char.tower.limitL1')}
+                  </label>
+                  <DecimalInput
+                    disabled={isPropDisabled}
+                    value={propagationConfig.l1 ?? 0}
+                    onChange={val => onUpdatePropagation?.({ ...propagationConfig, l1: val })}
+                    className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-center disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5">
+                    {t('char.tower.limitL2')}
+                  </label>
+                  <DecimalInput
+                    disabled={isPropDisabled}
+                    value={propagationConfig.limit ?? 10}
+                    onChange={val => onUpdatePropagation?.({ ...propagationConfig, limit: val })}
+                    className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-center disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Triangular, Rectangular, Sinusoidal parameters: limit L */}
+            {['triangular', 'rectangular', 'sinusoidal'].includes(propagationConfig.type) && (
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-0.5">
+                  {t('char.tower.limit')}
+                </label>
+                <DecimalInput
+                  disabled={isPropDisabled}
+                  value={propagationConfig.limit ?? 10}
+                  onChange={val => onUpdatePropagation?.({ ...propagationConfig, limit: val })}
+                  className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-center disabled:cursor-not-allowed"
+                />
+              </div>
+            )}
+
+            {/* MaxRatio: optional override limit L */}
+            {propagationConfig.type === 'maxRatio' && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">L =</span>
+                <DecimalInput
+                  disabled={isPropDisabled}
+                  placeholder="Máx."
+                  value={propagationConfig.limit}
+                  onChange={val => onUpdatePropagation?.({ ...propagationConfig, limit: val })}
+                  className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-center disabled:cursor-not-allowed"
+                />
+              </div>
+            )}
+
+            {/* Custom formula input */}
             {propagationConfig.type === 'custom' && (
               <input
                 type="text"
                 disabled={isPropDisabled}
-                value={propagationConfig.customExpr ?? 'd / L'}
+                value={propagationConfig.customExpr ?? ''}
                 onChange={e => onUpdatePropagation?.({ ...propagationConfig, customExpr: e.target.value })}
-                placeholder="d / L"
+                placeholder="exp(-d / 2)"
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:cursor-not-allowed"
               />
             )}
@@ -197,6 +328,8 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
                 ? t('soccer.affinity.propagationDescTriangular')
                 : propagationConfig.type === 'rectangular'
                 ? t('soccer.affinity.propagationDescRectangular')
+                : propagationConfig.type === 'trapezoidal'
+                ? t('soccer.affinity.propagationDescTrapezoidal')
                 : propagationConfig.type === 'sinusoidal'
                 ? t('soccer.affinity.propagationDescSinusoidal')
                 : propagationConfig.type === 'inhibited'
@@ -240,21 +373,32 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
               className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer font-medium disabled:cursor-not-allowed"
             >
               <option value="none">{t('soccer.affinity.blockingTypeNone')}</option>
+              <option value="standard">{t('char.tower.block.standard')}</option>
               <option value="threshold">{t('soccer.affinity.blockingTypeThreshold')}</option>
-              <option value="custom">{t('soccer.affinity.blockingTypeCustom')}</option>
+              <option value="custom">{t('char.tower.block.custom') || 'Personalizada'}</option>
             </select>
 
             <FormulaCodeDisplay
-              code={
-                blockingConfig.type === 'threshold'
-                  ? 'a < theta ? 0 : a'
-                  : blockingConfig.type === 'custom'
-                  ? blockingConfig.customExpr || 'a < theta ? 0 : a'
-                  : 'a'
-              }
+              code={getBlockingFormula(blockingConfig)}
               compact
             />
 
+            {/* Standard blocking: scalar vb factor */}
+            {blockingConfig.type === 'standard' && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">vb =</span>
+                <DecimalInput
+                  disabled={isBlockDisabled}
+                  min={0}
+                  max={1}
+                  value={blockingConfig.vb ?? 0.0}
+                  onChange={val => onUpdateBlocking?.({ ...blockingConfig, vb: val })}
+                  className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 text-center disabled:cursor-not-allowed"
+                />
+              </div>
+            )}
+
+            {/* Threshold blocking: theta threshold */}
             {blockingConfig.type === 'threshold' && (
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">θ =</span>
@@ -269,19 +413,22 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
               </div>
             )}
 
+            {/* Custom formula input */}
             {blockingConfig.type === 'custom' && (
               <input
                 type="text"
                 disabled={isBlockDisabled}
-                value={blockingConfig.customExpr ?? 'a < theta ? 0 : a'}
+                value={blockingConfig.customExpr ?? ''}
                 onChange={e => onUpdateBlocking?.({ ...blockingConfig, customExpr: e.target.value })}
-                placeholder="a < theta ? 0 : a"
+                placeholder="i == j ? (1 / S)^(1 - vb) : (a / (S - 1)) * (1 - (1 / S)^(1 - vb))"
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:cursor-not-allowed"
               />
             )}
 
             <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {blockingConfig.type === 'threshold'
+              {blockingConfig.type === 'standard'
+                ? t('soccer.affinity.blockingDescStandard')
+                : blockingConfig.type === 'threshold'
                 ? t('soccer.affinity.blockingDescThreshold')
                 : blockingConfig.type === 'custom'
                 ? t('soccer.affinity.blockingDescCustom')
@@ -321,22 +468,17 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
               onChange={e => onUpdateSynergy?.({ ...synergyConfig, type: e.target.value as any })}
               className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer font-medium disabled:cursor-not-allowed"
             >
-              <option value="none">{t('soccer.dimension.synergyTypeNone')}</option>
-              <option value="factor">{t('soccer.dimension.synergyTypeFactor')}</option>
-              <option value="custom">{t('soccer.dimension.synergyTypeCustom')}</option>
+              <option value="none">{t('char.tower.syn.none')}</option>
+              <option value="factor">{t('char.tower.syn.factor')}</option>
+              <option value="custom">{t('char.tower.syn.custom') || 'Personalizada'}</option>
             </select>
 
             <FormulaCodeDisplay
-              code={
-                synergyConfig?.type === 'factor'
-                  ? 'a * k'
-                  : synergyConfig?.type === 'custom'
-                  ? synergyConfig.customExpr || 'a * k'
-                  : 'a'
-              }
+              code={getSynergyFormula(synergyConfig)}
               compact
             />
 
+            {/* Factor k input */}
             {synergyConfig?.type === 'factor' && (
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">k =</span>
@@ -351,13 +493,14 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
               </div>
             )}
 
+            {/* Custom formula input */}
             {synergyConfig?.type === 'custom' && (
               <input
                 type="text"
                 disabled={isSynDisabled}
-                value={synergyConfig.customExpr ?? 'a * k'}
+                value={synergyConfig.customExpr ?? ''}
                 onChange={e => onUpdateSynergy?.({ ...synergyConfig, customExpr: e.target.value })}
-                placeholder="a * k"
+                placeholder="min(1, a * 1.2)"
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed"
               />
             )}
@@ -407,31 +550,22 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
               <option value="byMinutes">{t('soccer.affinity.relativeTypeMinutes')}</option>
               <option value="byTouches">{t('soccer.affinity.relativeTypeTouches')}</option>
               <option value="byMean">{t('soccer.affinity.relativeTypeMean')}</option>
-              <option value="custom">{t('soccer.affinity.relativeTypeCustom')}</option>
+              <option value="custom">{t('soccer.affinity.relativeTypeCustom') || 'Personalizada'}</option>
             </select>
 
             <FormulaCodeDisplay
-              code={
-                relativeConfig.type === 'byMinutes'
-                  ? 'minutos / minutos_totales'
-                  : relativeConfig.type === 'byTouches'
-                  ? 'media_toques / toques'
-                  : relativeConfig.type === 'byMean'
-                  ? '1 / media_vc'
-                  : relativeConfig.type === 'custom'
-                  ? relativeConfig.customExpr || '1'
-                  : '1'
-              }
+              code={getRelativeFormula(relativeConfig)}
               compact
             />
 
+            {/* Custom formula input */}
             {relativeConfig.type === 'custom' && (
               <input
                 type="text"
                 disabled={isRelDisabled}
-                value={relativeConfig.customExpr ?? 'vp * (minutos / minutos_totales)'}
+                value={relativeConfig.customExpr ?? ''}
                 onChange={e => onUpdateRelativeAdjustment?.({ ...relativeConfig, customExpr: e.target.value })}
-                placeholder="vp * (minutos / minutos_totales)"
+                placeholder="minutos / minutos_totales"
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:cursor-not-allowed"
               />
             )}
@@ -481,32 +615,40 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
               onChange={e => onUpdateEqualization?.({ ...equalizationConfig, type: e.target.value as any })}
               className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer font-medium disabled:cursor-not-allowed"
             >
-              <option value="max">{t('soccer.affinity.equalizationTypeMax')}</option>
-              <option value="sum">{t('soccer.affinity.equalizationTypeSum')}</option>
-              <option value="none">{t('soccer.affinity.equalizationTypeNone')}</option>
-              <option value="custom">{t('soccer.affinity.equalizationTypeCustom')}</option>
+              <option value="max">{t('char.adj.norm.maximum')}</option>
+              <option value="sum">{t('char.adj.norm.sum') || 'Por Suma'}</option>
+              <option value="target">{t('char.adj.norm.target')}</option>
+              <option value="none">{t('char.adj.norm.none')}</option>
+              <option value="custom">{t('char.adj.norm.custom') || 'Personalizada'}</option>
             </select>
 
             <FormulaCodeDisplay
-              code={
-                equalizationConfig.type === 'sum'
-                  ? 'vp / sum_vp'
-                  : equalizationConfig.type === 'none'
-                  ? 'vp'
-                  : equalizationConfig.type === 'custom'
-                  ? equalizationConfig.customExpr || 'vp / max_vp'
-                  : 'vp / max_vp'
-              }
+              code={getEqualizationFormula(equalizationConfig)}
               compact
             />
 
+            {/* Target equalization: obj parameter */}
+            {equalizationConfig.type === 'target' && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono font-semibold">obj =</span>
+                <DecimalInput
+                  disabled={isEqDisabled}
+                  min={0.01}
+                  value={equalizationConfig.obj ?? 1.0}
+                  onChange={val => onUpdateEqualization?.({ ...equalizationConfig, obj: val })}
+                  className="w-full h-7 px-1.5 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-center disabled:cursor-not-allowed"
+                />
+              </div>
+            )}
+
+            {/* Custom formula input */}
             {equalizationConfig.type === 'custom' && (
               <input
                 type="text"
                 disabled={isEqDisabled}
-                value={equalizationConfig.customExpr ?? 'vp / max_vp'}
+                value={equalizationConfig.customExpr ?? ''}
                 onChange={e => onUpdateEqualization?.({ ...equalizationConfig, customExpr: e.target.value })}
-                placeholder="vp / max_vp"
+                placeholder="min(1, vcr / max_vcr)"
                 className="w-full h-7 px-2 text-xs font-mono rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed"
               />
             )}
@@ -514,6 +656,8 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
               {equalizationConfig.type === 'sum'
                 ? t('soccer.affinity.equalizationDescSum')
+                : equalizationConfig.type === 'target'
+                ? t('soccer.affinity.equalizationDescTarget')
                 : equalizationConfig.type === 'none'
                 ? t('soccer.affinity.equalizationDescNone')
                 : equalizationConfig.type === 'custom'

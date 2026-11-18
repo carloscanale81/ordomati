@@ -1533,16 +1533,18 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                           <FormulaCodeDisplay
                             code={
                               activeChar.prop.type === 'inhibited'
-                                ? '0'
+                                ? 'i == j ? 1 : 0'
                                 : activeChar.prop.type === 'triangular'
-                                ? 'd <= L ? (L - d) / L : 0'
+                                ? 'i == j ? 1 : (d <= L ? (L - d) / L : 0)'
                                 : activeChar.prop.type === 'rectangular'
-                                ? 'd <= L ? 1 : 0'
+                                ? 'i == j ? 1 : (d <= L ? 1 : 0)'
                                 : activeChar.prop.type === 'trapezoidal'
-                                ? 'd <= L1 ? 1 : (d <= L ? (L - d) / (L - L1) : 0)'
+                                ? 'i == j ? 1 : (d <= L1 ? 1 : (d <= L ? (L - d) / (L - L1) : 0))'
                                 : activeChar.prop.type === 'sinusoidal'
-                                ? 'd <= L ? 0.5 * (1 + cos(pi * d / L)) : 0'
-                                : activeChar.prop.customExpr || 'exp(-d / 2)'
+                                ? 'i == j ? 1 : (d <= L ? 0.5 * (1 + cos(pi * d / L)) : 0)'
+                                : (activeChar.prop.customExpr?.includes('i == j') || activeChar.prop.customExpr?.includes('i==j'))
+                                ? activeChar.prop.customExpr
+                                : `i == j ? 1 : (${activeChar.prop.customExpr || 'exp(-d / 2)'})`
                             }
                             className="mt-2"
                           />
@@ -1877,8 +1879,10 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                               activeChar.syn.type === 'none'
                                 ? 'a'
                                 : activeChar.syn.type === 'factor'
-                                ? 'a * k'
-                                : activeChar.syn.customExpr || 'min(1, a * 1.2)'
+                                ? 'i == j ? a : a * k'
+                                : (activeChar.syn.customExpr?.includes('i == j') || activeChar.syn.customExpr?.includes('i==j'))
+                                ? activeChar.syn.customExpr
+                                : `i == j ? a : (${activeChar.syn.customExpr || 'min(1, a * 1.2)'})`
                             }
                             className="mt-2"
                           />
@@ -2336,7 +2340,9 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                     >
                       <option value="none">{t('char.adj.norm.none')}</option>
                       <option value="maximum">{t('char.adj.norm.maximum')}</option>
+                      <option value="sum">{t('char.adj.norm.sum') || 'Por Suma'}</option>
                       <option value="target">{t('char.adj.norm.target')}</option>
+                      <option value="custom">{t('char.adj.norm.custom') || 'Personalizada'}</option>
                     </select>
                     <FormulaCodeDisplay
                       code={
@@ -2344,6 +2350,10 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                           ? 'vcr'
                           : activeChar.adj.normType === 'target'
                           ? 'min(1, vcr / obj)'
+                          : activeChar.adj.normType === 'sum'
+                          ? 'vcr / sum_vcr'
+                          : activeChar.adj.normType === 'custom'
+                          ? activeChar.adj.customExpr || 'min(1, vcr / max_vcr)'
                           : 'min(1, vcr / max_vcr)'
                       }
                       className="mb-3"
@@ -2358,6 +2368,20 @@ export const CharacteristicPhase: React.FC<CharacteristicPhaseProps> = ({
                           onChange={val => updateActiveCharNested('adj', 'obj', val)}
                           className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                           placeholder={t('char.adj.targetValue')}
+                        />
+                      </div>
+                    )}
+                    {activeChar.adj.normType === 'custom' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                          {t('char.adj.customExpr') || 'Fórmula Personalizada f(vcr)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={activeChar.adj.customExpr || ''}
+                          placeholder="min(1, vcr / max_vcr)"
+                          onChange={e => updateActiveCharNested('adj', 'customExpr', e.target.value)}
+                          className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                       </div>
                     )}

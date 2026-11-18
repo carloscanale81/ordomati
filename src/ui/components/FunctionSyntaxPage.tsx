@@ -58,44 +58,58 @@ export const FunctionSyntaxPage: React.FC<FunctionSyntaxPageProps> = ({ isSideba
     {
       category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Triangular' : 'Triangular Propagation',
-      math: 'a_{ij} = \\max\\left(0, 1 - \\frac{d_{ij}}{L}\\right)',
-      syntax: 'max(0, 1 - (d / L))',
-      desc: isEs ? 'Decaimiento lineal continuo hasta anularse a partir de la distancia límite L.' : 'Linear decay down to zero starting from limit distance L.'
+      math: 'i = j \\Rightarrow 1; \\; i \\neq j \\Rightarrow \\max\\left(0, 1 - \\frac{d_{ij}}{L}\\right)',
+      syntax: 'i == j ? 1 : (d <= L ? (L - d) / L : 0)',
+      desc: isEs ? 'Autorreflexividad a_ii=1 en diagonal; decaimiento lineal continuo entre alternativas distintas hasta anularse a partir de L.' : 'Self-reflexive a_ii=1 on diagonal; linear decay down to zero between distinct elements starting from L.'
     },
     {
       category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Rectangular' : 'Rectangular Propagation',
-      math: 'a_{ij} = 1 \\text{ si } d_{ij} \\le L, \\; 0 \\text{ si } d_{ij} > L',
-      syntax: 'd <= L ? 1 : 0',
-      desc: isEs ? 'Función escalón o compuerta booleana de alcance estricto.' : 'Step gate function with strict threshold range.'
+      math: 'i = j \\Rightarrow 1; \\; i \\neq j \\Rightarrow (d_{ij} \\le L ? 1 : 0)',
+      syntax: 'i == j ? 1 : (d <= L ? 1 : 0)',
+      desc: isEs ? 'Autorreflexividad a_ii=1 en diagonal; función escalón o compuerta booleana de alcance estricto entre alternativas distintas.' : 'Self-reflexive a_ii=1 on diagonal; step gate function with strict threshold range between distinct elements.'
     },
     {
       category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Trapezoidal' : 'Trapezoidal Propagation',
-      math: 'd \\le L_1 \\Rightarrow 1; \\; d \\ge L \\Rightarrow 0; \\; \\text{resto} \\Rightarrow \\frac{L - d}{L - L_1}',
-      syntax: 'd <= L1 ? 1 : (d >= L ? 0 : (L - d) / (L - L1))',
-      desc: isEs ? 'Meseta constante hasta el límite L1 y decaimiento lineal posterior hasta L.' : 'Constant plateau up to limit L1 followed by linear decay to L.'
+      math: 'i = j \\Rightarrow 1; \\; d \\le L_1 \\Rightarrow 1; \\; d \\ge L \\Rightarrow 0; \\; \\text{resto} \\Rightarrow \\frac{L - d}{L - L_1}',
+      syntax: 'i == j ? 1 : (d <= L1 ? 1 : (d <= L ? (L - d) / (L - L1) : 0))',
+      desc: isEs ? 'Autorreflexividad a_ii=1 en diagonal; meseta constante hasta el límite L1 y decaimiento lineal posterior hasta L.' : 'Self-reflexive a_ii=1 on diagonal; constant plateau up to L1 followed by linear decay to L.'
     },
     {
       category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Sinusoidal' : 'Sinusoidal Propagation',
-      math: 'a_{ij} = \\frac{1}{2}\\left(1 + \\cos\\left(\\frac{\\pi d_{ij}}{L}\\right)\\right)',
-      syntax: 'd <= L ? 0.5 * (1 + cos(pi * d / L)) : 0',
-      desc: isEs ? 'Modulación suave no lineal armónica con tangencia cero en los extremos (a=1 en d=0, a=0 en d=L).' : 'Smooth harmonic non-linear modulation with zero tangency at endpoints (a=1 at d=0, a=0 at d=L).'
+      math: 'i = j \\Rightarrow 1; \\; i \\neq j \\Rightarrow \\frac{1}{2}\\left(1 + \\cos\\left(\\frac{\\pi d_{ij}}{L}\\right)\\right)',
+      syntax: 'i == j ? 1 : (d <= L ? 0.5 * (1 + cos(pi * d / L)) : 0)',
+      desc: isEs ? 'Autorreflexividad a_ii=1 en diagonal; modulación suave no lineal armónica con tangencia cero en los extremos.' : 'Self-reflexive a_ii=1 on diagonal; smooth harmonic non-linear modulation with zero tangency at endpoints.'
     },
     {
       category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Inhibida' : 'Inhibited Propagation',
-      math: 'a_{ij} = 0 \\quad (i \\neq j)',
-      syntax: '0',
-      desc: isEs ? 'Anula la afinidad propagada entre elementos distintos (mantiene únicamente a_ii = 1).' : 'Nullifies propagated affinity between distinct elements (preserves strictly a_ii = 1).'
+      math: 'i = j \\Rightarrow 1; \\; i \\neq j \\Rightarrow 0',
+      syntax: 'i == j ? 1 : 0',
+      desc: isEs ? 'Anula la afinidad propagada entre elementos distintos (mantiene estrictamente a_ii = 1 en la diagonal).' : 'Nullifies propagated affinity between distinct elements (strictly preserves a_ii = 1 on diagonal).'
+    },
+    {
+      category: isEs ? 'Propagación' : 'Propagation',
+      name: isEs ? 'División por Máxima (Ordoexperto)' : 'Max Ratio Propagation (Ordoexpert)',
+      math: 'i = j \\Rightarrow 1; \\; i \\neq j \\Rightarrow \\frac{d_{ij}}{\\max(D)}',
+      syntax: 'i == j ? 1 : (L > 0 ? d / L : 0)',
+      desc: isEs ? 'Afinidad proporcional directa al volumen de interacción relativo al máximo del segmento.' : 'Affinity proportional to interaction volume relative to segment maximum.'
     },
     {
       category: isEs ? 'Propagación' : 'Propagation',
       name: isEs ? 'Propagación Gaussiana (Personalizada)' : 'Gaussian Propagation (Custom Example)',
-      math: 'a_{ij} = \\exp\\left(-\\left(\\frac{d_{ij}}{L}\\right)^2\\right)',
-      syntax: 'exp(- (d / L)^2)',
-      desc: isEs ? 'Decaimiento gaussiano exponencial suave acentuado para transiciones de corto alcance.' : 'Steep smooth Gaussian exponential decay for localized interactions.'
+      math: 'i = j \\Rightarrow 1; \\; i \\neq j \\Rightarrow \\exp\\left(-\\left(\\frac{d_{ij}}{L}\\right)^2\\right)',
+      syntax: 'i == j ? 1 : exp(- (d / L)^2)',
+      desc: isEs ? 'Autorreflexividad a_ii=1 en diagonal; decaimiento gaussiano exponencial suave acentuado.' : 'Self-reflexive a_ii=1 on diagonal; steep smooth Gaussian exponential decay.'
+    },
+    {
+      category: isEs ? 'Bloqueo' : 'Blocking',
+      name: isEs ? 'Sin Bloqueo' : 'No Blocking',
+      math: 'A^A = A',
+      syntax: 'a',
+      desc: isEs ? 'Mantiene inalterada la matriz de afinidad (A^A = A).' : 'Keeps affinity matrix unaltered (A^A = A).'
     },
     {
       category: isEs ? 'Bloqueo' : 'Blocking',
@@ -107,9 +121,9 @@ export const FunctionSyntaxPage: React.FC<FunctionSyntaxPageProps> = ({ isSideba
     {
       category: isEs ? 'Bloqueo' : 'Blocking',
       name: isEs ? 'Bloqueo por Umbral' : 'Threshold Blocking',
-      math: 'a_{ij} < \\theta \\Rightarrow 0; \\; a_{ij} \\ge \\theta \\Rightarrow a_{ij}',
-      syntax: 'a < theta ? 0 : a',
-      desc: isEs ? 'Filtra y anula las afinidades débiles por debajo del umbral theta seleccionado.' : 'Filters and nullifies weak affinities below the selected threshold theta.'
+      math: 'i = j \\Rightarrow 1; \\; a_{ij} < \\theta \\Rightarrow 0; \\; a_{ij} \\ge \\theta \\Rightarrow a_{ij}',
+      syntax: 'i == j ? 1 : (a < theta ? 0 : a)',
+      desc: isEs ? 'Conserva la diagonal a_ii=1 y anula las afinidades no diagonales por debajo del umbral theta seleccionado.' : 'Preserves diagonal a_ii=1 and zeroes off-diagonal affinities below threshold theta.'
     },
     {
       category: isEs ? 'Sinergia' : 'Synergy',
@@ -121,9 +135,9 @@ export const FunctionSyntaxPage: React.FC<FunctionSyntaxPageProps> = ({ isSideba
     {
       category: isEs ? 'Sinergia' : 'Synergy',
       name: isEs ? 'Sinergia por Factor' : 'Factor Synergy',
-      math: 'a^C_{ij} = a_{ij} \\cdot k',
-      syntax: 'a * k',
-      desc: isEs ? 'Modula multiplicativamente la afinidad autoinducida según el factor k.' : 'Multiplicatively modulates autoinduced affinity by factor k.'
+      math: 'i = j \\Rightarrow a_{ii}; \\; i \\neq j \\Rightarrow a_{ij} \\cdot k',
+      syntax: 'i == j ? a : a * k',
+      desc: isEs ? 'Conserva la diagonal inalterada y modula multiplicativamente las afinidades entre distintas alternativas según el factor k.' : 'Preserves diagonal unchanged and multiplicatively modulates off-diagonal affinities by factor k.'
     },
     {
       category: isEs ? 'Ajuste Relativo' : 'Relative Adjustment',
@@ -145,6 +159,13 @@ export const FunctionSyntaxPage: React.FC<FunctionSyntaxPageProps> = ({ isSideba
       math: 'V^{CRN}_{i} = \\min\\left(1, \\frac{V^{CR}_{i}}{\\max_k V^{CR}_{k}}\\right)',
       syntax: 'min(1, vcr / max_vcr)',
       desc: isEs ? 'Escala los valores relativos al intervalo [0, 1] dividiendo entre el valor máximo observado en la dimensión.' : 'Scales relative values to [0, 1] dividing by the maximum value observed in the dimension.'
+    },
+    {
+      category: isEs ? 'Equiparación Interdimensional' : 'Equalization Adjustment',
+      name: isEs ? 'Equiparación por Suma' : 'Sum Equalization',
+      math: 'V^{CRN}_{i} = \\frac{V^{CR}_{i}}{\\sum_k V^{CR}_{k}}',
+      syntax: 'vcr / sum_vcr',
+      desc: isEs ? 'Normaliza los valores en un reparto unitario cuya suma total es 1.' : 'Normalizes values into a unit distribution whose total sum is 1.'
     },
     {
       category: isEs ? 'Equiparación Interdimensional' : 'Equalization Adjustment',

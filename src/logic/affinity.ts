@@ -185,7 +185,7 @@ export const computeAutoinducedAffinity = (
     }
 
     // In 'none' blocking, blocking factor is strictly 0 (no blocking / pure proportional distribution)
-    const blockFactor = blockType === 'none' ? 0 : (vb[i] ?? 0);
+    const blockFactor = blockType === 'none' ? 0 : (blockConfig?.vb !== undefined ? blockConfig.vb : (vb[i] ?? 0));
 
     if (blockType === 'custom' && blockConfig?.customExpr) {
       const customExpr = blockConfig.customExpr;
