@@ -193,8 +193,6 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
       case 'max':
       case 'maximum':
         return 'min(1, vcr / max_vcr)';
-      case 'sum':
-        return 'vcr / sum_vcr';
       case 'target':
         return 'min(1, vcr / obj)';
       case 'custom':
@@ -616,7 +614,6 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
               className="w-full h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer font-medium disabled:cursor-not-allowed"
             >
               <option value="max">{t('char.adj.norm.maximum')}</option>
-              <option value="sum">{t('char.adj.norm.sum') || 'Por Suma'}</option>
               <option value="target">{t('char.adj.norm.target')}</option>
               <option value="none">{t('char.adj.norm.none')}</option>
               <option value="custom">{t('char.adj.norm.custom') || 'Personalizada'}</option>
@@ -654,9 +651,7 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             )}
 
             <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {equalizationConfig.type === 'sum'
-                ? t('soccer.affinity.equalizationDescSum')
-                : equalizationConfig.type === 'target'
+              {equalizationConfig.type === 'target'
                 ? t('soccer.affinity.equalizationDescTarget')
                 : equalizationConfig.type === 'none'
                 ? t('soccer.affinity.equalizationDescNone')
