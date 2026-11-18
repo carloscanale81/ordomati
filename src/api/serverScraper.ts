@@ -150,7 +150,8 @@ export async function scrapeMatchServer(targetUrl: string): Promise<ScrapeMatchR
         matchTitle,
         matchData: extracted,
         jsonString: JSON.stringify(extracted, null, 2),
-        source: 'live-scraped'
+        source: 'live-scraped',
+        isTestData: false
       };
     }
   }
@@ -173,7 +174,8 @@ export async function scrapeMatchServer(targetUrl: string): Promise<ScrapeMatchR
         matchTitle,
         matchData: extracted,
         jsonString: JSON.stringify(extracted, null, 2),
-        source: 'live-scraped'
+        source: 'live-scraped',
+        isTestData: false
       };
     }
   }

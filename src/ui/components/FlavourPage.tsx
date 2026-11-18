@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowDownToLine,
   Calendar,
   CheckCircle2,
@@ -97,7 +98,7 @@ const FLAVOUR_TEXT_KEYS: Record<
 };
 
 interface StatusNotice {
-  kind: 'success' | 'error';
+  kind: 'success' | 'error' | 'warning';
   message: string;
 }
 
@@ -598,12 +599,60 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
         setSoccerAnalysisCalculated(true);
       }
 
-      setNotice({
-        kind: 'success',
-        message: t('flavours.analysisControls.statusScrapedSuccess', {
-          chars: jsonStr.length.toLocaleString(language)
-        })
-      });
+      // Check whether test / recreation fallback data was loaded and whether it matches the requested URL
+      let parsedData: any = scrapeResult.matchData;
+      if (!parsedData && jsonStr) {
+        try {
+          parsedData = JSON.parse(jsonStr);
+        } catch {
+          parsedData = null;
+        }
+      }
+
+      const isRecreationSource =
+        scrapeResult.source === 'match-recreation' ||
+        Boolean(scrapeResult.isTestData) ||
+        Boolean(parsedData?.isTestData);
+
+      // Check URL match ID vs loaded match ID
+      const urlMatchIdMatch = trimmed.match(/\/matches\/(\d+)/i);
+      const urlMatchId = urlMatchIdMatch ? parseInt(urlMatchIdMatch[1], 10) : null;
+      const loadedMatchId = typeof parsedData?.matchId === 'number' ? parsedData.matchId : null;
+      const isIdMismatch = urlMatchId !== null && loadedMatchId !== null && urlMatchId !== loadedMatchId;
+
+      // Check if URL indicates specific teams that differ from loaded data
+      const urlLower = trimmed.toLowerCase();
+      const isDefault2007644 = loadedMatchId === 2007644 || parsedData?.home?.name === 'España' || parsedData?.home?.name === 'Spain';
+      const urlIsSpainArgentina =
+        urlLower.includes('2007644') ||
+        (urlLower.includes('spain') && urlLower.includes('argentina')) ||
+        (urlLower.includes('espana') && urlLower.includes('argentina'));
+      const isTeamMismatch = isDefault2007644 && !urlIsSpainArgentina && urlMatchId !== 2007644;
+
+      // Check if data is generic placeholder dummy data (e.g. "P1", "P2")
+      const isDummyData = parsedData?.home?.players?.some(
+        (p: any) => typeof p.name === 'string' && / P\d+$/.test(p.name)
+      );
+
+      const isTestDataLoaded = isRecreationSource || isIdMismatch || isTeamMismatch || isDummyData;
+
+      if (isTestDataLoaded) {
+        setNotice({
+          kind: 'warning',
+          message: isIdMismatch || isTeamMismatch
+            ? t('flavours.analysisControls.statusScrapedMismatchWarning', {
+                chars: jsonStr.length.toLocaleString(language)
+              })
+            : t('flavours.analysisControls.statusScrapedFallbackWarning')
+        });
+      } else {
+        setNotice({
+          kind: 'success',
+          message: t('flavours.analysisControls.statusScrapedSuccess', {
+            chars: jsonStr.length.toLocaleString(language)
+          })
+        });
+      }
     } catch (err: any) {
       setNotice({
         kind: 'error',
@@ -1353,14 +1402,18 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                 className={`mt-4 flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs font-medium ${
                   notice.kind === 'success'
                     ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300'
+                    : notice.kind === 'warning'
+                    ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-200'
                     : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   {notice.kind === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  ) : notice.kind === 'warning' ? (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
                   )}
                   <span>{notice.message}</span>
                 </div>

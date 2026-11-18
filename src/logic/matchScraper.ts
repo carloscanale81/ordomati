@@ -14,6 +14,7 @@ export interface ScrapeMatchResult {
   matchData?: Record<string, unknown>;
   jsonString: string;
   source: 'live-scraped' | 'match-recreation' | 'manual';
+  isTestData?: boolean;
   error?: string;
 }
 
@@ -142,6 +143,7 @@ export const extractMatchCentreDataFromHtml = (html: string): Record<string, unk
  */
 export const createRecreationMatchData2007644 = (): Record<string, unknown> => ({
   matchId: 2007644,
+  isTestData: true,
   sourceUrl: DEFAULT_SOCCER_MATCH_URL,
   matchDate: '2026-07-19T20:00:00Z',
   competition: 'FIFA World Cup 2026',
@@ -1152,6 +1154,7 @@ export function enrichMatchDataWithMetadata(
 
 /**
  * Generic match recreation dataset generated from URL matchId or path.
+ * Generates an authentic 11-player lineup for both teams with regulation 90-minute structure.
  */
 export const createGenericMatchData = (url: string): Record<string, unknown> => {
   const matchIdMatch = url.match(/\/matches\/(\d+)/i);
@@ -1162,9 +1165,50 @@ export const createGenericMatchData = (url: string): Record<string, unknown> => 
   }
 
   const meta = extractMatchInfoFromUrl(url);
+  const homeName = meta.homeTeam || 'Home Team';
+  const awayName = meta.awayTeam || 'Away Team';
+
+  const defaultPositions = [
+    { pos: 'GK', name: 'Portero', rating: 7.2, stats: { totalPasses: 28, accuratePasses: 22, saves: 4 } },
+    { pos: 'RB', name: 'Lat. Derecho', rating: 7.0, stats: { totalPasses: 45, accuratePasses: 38, tackles: 3, keyPasses: 1 } },
+    { pos: 'CB', name: 'Central Der.', rating: 7.1, stats: { totalPasses: 55, accuratePasses: 50, clearances: 5, interceptions: 2 } },
+    { pos: 'CB', name: 'Central Izq.', rating: 7.3, stats: { totalPasses: 58, accuratePasses: 52, clearances: 4, tackles: 2 } },
+    { pos: 'LB', name: 'Lat. Izquierdo', rating: 7.1, stats: { totalPasses: 48, accuratePasses: 40, tackles: 3, interceptions: 1 } },
+    { pos: 'CDM', name: 'Pivote', rating: 7.5, stats: { totalPasses: 65, accuratePasses: 60, tackles: 4, interceptions: 3 } },
+    { pos: 'CM', name: 'Interior Der.', rating: 7.4, stats: { totalPasses: 62, accuratePasses: 55, keyPasses: 2, tackles: 2 } },
+    { pos: 'CM', name: 'Interior Izq.', rating: 7.6, stats: { totalPasses: 59, accuratePasses: 53, keyPasses: 3, assists: 1 } },
+    { pos: 'RW', name: 'Extremo Der.', rating: 7.8, stats: { totalPasses: 36, accuratePasses: 30, keyPasses: 2, dribbles: 3 } },
+    { pos: 'ST', name: 'Delantero', rating: 8.1, stats: { totalPasses: 24, accuratePasses: 19, shots: 4, goals: 1 } },
+    { pos: 'LW', name: 'Extremo Izq.', rating: 7.7, stats: { totalPasses: 38, accuratePasses: 32, keyPasses: 3, dribbles: 4 } }
+  ];
+
+  const homePlayers = defaultPositions.map((p, idx) => ({
+    id: 100 + idx + 1,
+    name: `${homeName} - ${p.name}`,
+    position: p.pos,
+    shirtNo: idx + 1,
+    isFirstEleven: true,
+    rating: p.rating,
+    stats: p.stats
+  }));
+
+  const awayPlayers = defaultPositions.map((p, idx) => ({
+    id: 200 + idx + 1,
+    name: `${awayName} - ${p.name}`,
+    position: p.pos,
+    shirtNo: idx + 1,
+    isFirstEleven: true,
+    rating: Number((p.rating - 0.2 + (idx % 3) * 0.2).toFixed(1)),
+    stats: p.stats
+  }));
+
+  const playerIdNameDict: Record<string, string> = {};
+  for (const p of homePlayers) playerIdNameDict[String(p.id)] = p.name;
+  for (const p of awayPlayers) playerIdNameDict[String(p.id)] = p.name;
 
   return {
     matchId,
+    isTestData: true,
     sourceUrl: url,
     competition: meta.competition,
     stage: meta.stage,
@@ -1172,36 +1216,46 @@ export const createGenericMatchData = (url: string): Record<string, unknown> => 
     venueName: meta.venueName,
     extractedAt: new Date().toISOString(),
     matchStatus: 'FullTime',
+    score: '1 : 1',
+    htScore: '0 : 0',
+    ftScore: '1 : 1',
+    elapsedMinutes: 90,
+    maxMinute: 90,
+    expandedMinutes: 90,
+    periodCode: 2,
+    periodName: 'FT',
+    periodEndMinutes: { '1': 45, '2': 90 },
+    periodMinuteLimits: { '1': 45, '2': 90 },
+    playerIdNameDictionary: playerIdNameDict,
     home: {
-      name: meta.homeTeam,
+      teamId: 10,
+      name: homeName,
       formation: '4-3-3',
       score: 1,
-      players: [
-        { id: 1, name: `${meta.homeTeam} P1`, position: 'FW', rating: 8.2, goals: 1 },
-        { id: 2, name: `${meta.homeTeam} P2`, position: 'MF', rating: 7.6, keyPasses: 3 },
-        { id: 3, name: `${meta.homeTeam} P3`, position: 'DF', rating: 7.1, tackles: 4 }
-      ]
+      players: homePlayers
     },
     away: {
-      name: meta.awayTeam,
-      formation: '4-2-3-1',
+      teamId: 20,
+      name: awayName,
+      formation: '4-3-3',
       score: 1,
-      players: [
-        { id: 4, name: `${meta.awayTeam} P1`, position: 'FW', rating: 7.9, goals: 1 },
-        { id: 5, name: `${meta.awayTeam} P2`, position: 'MF', rating: 7.4, passes: 65 },
-        { id: 6, name: `${meta.awayTeam} P3`, position: 'DF', rating: 7.0, interceptions: 3 }
-      ]
+      players: awayPlayers
     },
     events: [
-      { minute: 23, type: 'Goal', player: `${meta.homeTeam} P1` },
-      { minute: 68, type: 'Goal', player: `${meta.awayTeam} P1` }
+      { id: 1, minute: 12, second: 30, period: 1, teamId: 10, playerId: 106, type: { displayName: 'Tackle' }, outcomeType: { displayName: 'Successful' } },
+      { id: 2, minute: 28, second: 15, period: 1, teamId: 20, playerId: 209, type: { displayName: 'SavedShot' }, outcomeType: { displayName: 'Successful' } },
+      { id: 3, minute: 41, second: 50, period: 1, teamId: 10, playerId: 108, type: { displayName: 'Pass' }, outcomeType: { displayName: 'Successful' } },
+      { id: 4, minute: 54, second: 10, period: 2, teamId: 10, playerId: 110, type: { displayName: 'Goal' }, outcomeType: { displayName: 'Successful' } },
+      { id: 5, minute: 67, second: 45, period: 2, teamId: 20, playerId: 206, type: { displayName: 'Tackle' }, outcomeType: { displayName: 'Successful' } },
+      { id: 6, minute: 78, second: 20, period: 2, teamId: 20, playerId: 210, type: { displayName: 'Goal' }, outcomeType: { displayName: 'Successful' } },
+      { id: 7, minute: 88, second: 10, period: 2, teamId: 10, playerId: 109, type: { displayName: 'Foul' }, outcomeType: { displayName: 'Successful' } }
     ]
   };
 };
 
 /**
  * Scrapes WhoScored match data from a URL.
- * Handles both live HTML responses and automatic canonical match recreation data
+ * Handles direct JSON endpoints, live HTML responses, and automatic canonical match recreation data
  * when direct bot HTTP fetching is blocked by network boundaries or Cloudflare anti-bot challenges.
  */
 export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> => {
@@ -1217,6 +1271,40 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
 
   const urlMatchId = trimmed.match(/\/matches\/(\d+)/i);
   const parsedUrlMatchId = urlMatchId ? parseInt(urlMatchId[1], 10) : undefined;
+
+  // 0. Direct JSON endpoint / static match file check
+  if (trimmed.endsWith('.json') || trimmed.includes('/api/')) {
+    try {
+      const res = await fetch(trimmed, {
+        headers: { 'Accept': 'application/json, text/plain, */*' },
+        signal: AbortSignal.timeout(6000)
+      });
+      if (res.ok) {
+        const text = await res.text();
+        const parsed = JSON.parse(text);
+        const extracted = parsed.matchCentreData || parsed;
+        if (extracted && (extracted.home || extracted.players || extracted.events)) {
+          enrichMatchDataWithMetadata(extracted, trimmed, text);
+          const mId = typeof extracted.matchId === 'number' ? extracted.matchId : parsedUrlMatchId;
+          extracted.matchId = mId;
+          const homeTeam = (extracted.home as any)?.name || 'Home';
+          const awayTeam = (extracted.away as any)?.name || 'Away';
+          const matchTitle = `${homeTeam} vs ${awayTeam} (Match ${mId || ''})`.trim();
+          return {
+            success: true,
+            matchId: mId,
+            matchTitle,
+            matchData: extracted,
+            jsonString: JSON.stringify(extracted, null, 2),
+            source: 'live-scraped',
+            isTestData: false
+          };
+        }
+      }
+    } catch {
+      // Continue to next extraction method
+    }
+  }
 
   // 1. In Node.js runtime, attempt authentic browser / live HTTP fetch for WhoScored match URLs
   const isNode = typeof window === 'undefined';
@@ -1292,7 +1380,8 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
                 matchTitle,
                 matchData: extracted,
                 jsonString: JSON.stringify(extracted, null, 2),
-                source: 'live-scraped'
+                source: 'live-scraped',
+                isTestData: false
               };
             }
           }
@@ -1335,7 +1424,8 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
             matchTitle: (extracted.matchTitle as string) || (mId ? `Match ${mId}` : 'WhoScored Match Data'),
             matchData: extracted,
             jsonString: JSON.stringify(extracted, null, 2),
-            source: 'live-scraped'
+            source: 'live-scraped',
+            isTestData: false
           };
         }
       }
@@ -1356,7 +1446,8 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
       matchTitle: 'FIFA World Cup 2026 Final — España vs Argentina',
       matchData,
       jsonString: JSON.stringify(matchData, null, 2),
-      source: 'match-recreation'
+      source: 'match-recreation',
+      isTestData: true
     };
   }
 
@@ -1369,6 +1460,7 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
     matchTitle: `Match ${matchData.matchId || parsedUrlMatchId || 2007644}`,
     matchData,
     jsonString: JSON.stringify(matchData, null, 2),
-    source: 'match-recreation'
+    source: 'match-recreation',
+    isTestData: true
   };
 };
