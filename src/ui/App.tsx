@@ -25,6 +25,7 @@ import {
   isFlavourId
 } from '../logic';
 import { serializeFullCase, deserializeFullCase } from '../io/serializer';
+import { parseFlavourCase } from '../io/flavourIO';
 import { downloadJsonFile, readJsonFile } from '../io/browserIO';
 import { openOrdomaticsPdfReport } from '../io/ordomaticsPdfReport';
 import { PhaseStepper } from './components/PhaseStepper';
@@ -159,6 +160,20 @@ function AppContent() {
     }
   };
 
+  // Directly Import a Flavour Example Case from the Header Menu
+  const handleImportFlavourExample = (flavourId: FlavourId, exampleData: any) => {
+    try {
+      const restored = parseFlavourCase(exampleData, flavourId);
+      setFlavourCases(prev => ({
+        ...prev,
+        [flavourId]: restored
+      }));
+      setActiveView(flavourId);
+    } catch (err) {
+      console.error('Error importing flavour example case:', err);
+    }
+  };
+
   // Navigate to phase with smooth scrolling
   const scrollToPhase = (phaseIndex: number) => {
     // If target phase is collapsed, auto-expand it
@@ -238,6 +253,7 @@ function AppContent() {
             activeView={activeView}
             onSelectView={setActiveView}
             onImportExample={handleImportExample}
+            onImportFlavourExample={handleImportFlavourExample}
           />
         </div>
 
