@@ -7,6 +7,9 @@ export interface AppFooterProps {
   variant?: 'standard' | 'sidebar';
 }
 
+const teseoIcon = `${import.meta.env.BASE_URL}favicons/teseo.png`;
+const buleriaIcon = `${import.meta.env.BASE_URL}favicons/buleria.png`;
+
 /**
  * Hook to detect whether the right container's footer is currently visible within its scrollable root.
  */
@@ -125,7 +128,7 @@ export const AppFooter = forwardRef<HTMLElement, AppFooterProps>(
                 className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/80 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors border border-gray-200 dark:border-gray-700 font-semibold text-[11px] shadow-2xs"
                 title={isEs ? 'Ficha de la Tesis en el Sistema TESEO' : 'Doctoral Thesis in TESEO System'}
               >
-                <img src="/favicons/teseo.png" alt="TESEO" className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs" />
+                <img src={teseoIcon} alt="TESEO" className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs" />
                 <span className="truncate">TESEO</span>
               </a>
 
@@ -136,7 +139,7 @@ export const AppFooter = forwardRef<HTMLElement, AppFooterProps>(
                 className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/80 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors border border-gray-200 dark:border-gray-700 font-semibold text-[11px] shadow-2xs"
                 title={isEs ? 'Repositorio Institucional BULERIA (ULe)' : 'Institutional Repository BULERIA (ULe)'}
               >
-                <img src="/favicons/buleria.png" alt="BULERIA" className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs" />
+                <img src={buleriaIcon} alt="BULERIA" className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs" />
                 <span className="truncate">BULERIA (ULe)</span>
               </a>
             </div>
@@ -220,7 +223,7 @@ export const AppFooter = forwardRef<HTMLElement, AppFooterProps>(
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/80 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors border border-gray-200 dark:border-gray-700 font-semibold text-xs shadow-2xs"
               title={isEs ? 'Ficha de la Tesis en el Sistema TESEO (Ministerio de Ciencia e Innovación)' : 'Doctoral Thesis in TESEO System'}
             >
-              <img src="/favicons/teseo.png" alt="TESEO" className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs" />
+              <img src={teseoIcon} alt="TESEO" className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs" />
               <span>TESEO</span>
             </a>
             <a
@@ -230,7 +233,7 @@ export const AppFooter = forwardRef<HTMLElement, AppFooterProps>(
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200/80 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors border border-gray-200 dark:border-gray-700 font-semibold text-xs shadow-2xs"
               title={isEs ? 'Repositorio Institucional BULERIA (Biblioteca de la Universidad de León)' : 'Institutional Repository BULERIA (University of León Library)'}
             >
-              <img src="/favicons/buleria.png" alt="BULERIA" className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs" />
+              <img src={buleriaIcon} alt="BULERIA" className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs" />
               <span>BULERIA (ULe)</span>
             </a>
           </div>
