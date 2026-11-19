@@ -11,9 +11,7 @@ import {
   PanelLeftOpen,
   FileDown,
   RotateCcw,
-  AlertTriangle,
-  Construction,
-  GraduationCap
+  AlertTriangle
 } from 'lucide-react';
 import {
   createDefaultDataset,
@@ -35,6 +33,7 @@ import { PhaseStepper } from './components/PhaseStepper';
 import { LanguageSelector } from './components/LanguageSelector';
 import { ThemeToggle } from './components/ThemeToggle';
 import { MainNavMenu } from './components/MainNavMenu';
+import { NavStatusBadges } from './components/NavStatusBadges';
 import { FlavourPage } from './components/FlavourPage';
 import { FunctionSyntaxPage } from './components/FunctionSyntaxPage';
 import { AppFooter, useIsFooterVisible } from './components/AppFooter';
@@ -268,25 +267,10 @@ function AppContent() {
           />
         </div>
 
-        {/* Right: Academic notice, Development notice, Theme Toggle & Language Switcher */}
+        {/* Right: Expandable status badges, Theme Toggle & Language Switcher */}
         <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Academic purpose badge */}
-          <div
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-indigo-800 dark:text-indigo-300 shadow-xs select-none"
-            title={t('header.academicPurposeTooltip')}
-          >
-            <GraduationCap className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span className="hidden sm:inline font-medium whitespace-nowrap">{t('header.academicPurpose')}</span>
-          </div>
-
-          {/* Development notice badge */}
-          <div
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 shadow-xs select-none"
-            title={t('header.underDevelopmentTooltip')}
-          >
-            <Construction className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="hidden sm:inline font-medium whitespace-nowrap">{t('header.underDevelopment')}</span>
-          </div>
+          {/* Interactive status badges (Academic Thesis & Under Construction) */}
+          <NavStatusBadges />
 
           {/* Divider */}
           <div className="h-5 w-px bg-gray-200 dark:bg-gray-700 mx-0.5 sm:mx-1"></div>
