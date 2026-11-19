@@ -2,10 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import path from 'node:path';
+import fs from 'node:fs';
 import { createWebServer } from '../../web/server';
 
 test('Web Server: Static SPA file serving suite', async (t) => {
   const distDir = path.resolve(process.cwd(), 'dist');
+  const indexHtmlPath = path.join(distDir, 'index.html');
+  let createdDummy = false;
+
+  // Guarantee dist/index.html is available for server test even if run before build
+  if (!fs.existsSync(indexHtmlPath)) {
+    fs.mkdirSync(distDir, { recursive: true });
+    fs.writeFileSync(
+      indexHtmlPath,
+      '<!doctype html><html lang="es"><head><title>Ordomática</title></head><body><div id="root"></div></body></html>',
+      'utf-8'
+    );
+    createdDummy = true;
+  }
+
   const webServer = createWebServer(distDir);
 
   await new Promise<void>(resolve => {
@@ -18,6 +33,11 @@ test('Web Server: Static SPA file serving suite', async (t) => {
   t.after(() => {
     (webServer as any).closeAllConnections?.();
     webServer.close();
+    if (createdDummy) {
+      try {
+        fs.unlinkSync(indexHtmlPath);
+      } catch {}
+    }
   });
 
   // Test 1: GET / returns 200 with HTML content
