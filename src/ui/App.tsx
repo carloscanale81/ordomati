@@ -22,8 +22,7 @@ import {
   FlavourAnalysisCase,
   FlavourId,
   createInitialFlavourState,
-  isFlavourId,
-  APP_BUILD_VERSION
+  isFlavourId
 } from '../logic';
 import { serializeFullCase, deserializeFullCase } from '../io/serializer';
 import { parseFlavourCase } from '../io/flavourIO';
@@ -249,15 +248,7 @@ function AppContent() {
             </button>
           )}
           <Activity className="w-6 h-6 text-blue-600 dark:text-blue-400 shrink-0" />
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-gray-800 dark:text-gray-100">{t('app.title')}</h1>
-            <span
-              className="hidden lg:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-800 select-all"
-              title={`Versión: ${APP_BUILD_VERSION}`}
-            >
-              v{APP_BUILD_VERSION}
-            </span>
-          </div>
+          <h1 className="text-xl font-bold tracking-tight text-gray-800 dark:text-gray-100">{t('app.title')}</h1>
 
           <MainNavMenu
             activeView={activeView}
