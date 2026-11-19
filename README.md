@@ -2,6 +2,22 @@
 
 Aplicación web interactiva, motor de cálculo multicriterio y servidor MCP/API para análisis de matrices, afinidad contextual y relaciones de orden mediante el método de Ordomática.
 
+> 🌐 **Acceso Web en Producción (GitHub Pages):**  
+> 👉 **[https://carloscanale81.github.io/ordomati/](https://carloscanale81.github.io/ordomati/)**
+
+---
+
+## 🎓 Proyecto Académico y Marco Teórico
+
+Ordomática es un proyecto de investigación y desarrollo con **finalidad estrictamente académica**, fundamentado en la metodología original y la tesis doctoral desarrollada por **Carlos Caño Alegre**:
+
+* 🏛️ **Ficha Oficial en el Sistema TESEO** *(Ministerio de Ciencia, Innovación y Universidades)*:  
+  [https://aplicaciones.ciencia.gob.es/teseo/#/tesis/O397308/detalle](https://aplicaciones.ciencia.gob.es/teseo/#/tesis/O397308/detalle)
+* 📚 **Repositorio Institucional BULERIA** *(Biblioteca de la Universidad de León)*:  
+  [https://buleria.unileon.es/entities/publication/1431d535-a1a1-4e2c-9254-6b85d7bfa1e8](https://buleria.unileon.es/entities/publication/1431d535-a1a1-4e2c-9254-6b85d7bfa1e8)
+* 🌐 **Sitio Web del Autor:**  
+  [www.carloscanoalegre.com](https://www.carloscanoalegre.com)
+
 ---
 
 ## 🏛️ Arquitectura por Capas y Seguridad
@@ -36,7 +52,7 @@ La interfaz web de Ordomática es una **Single Page Application (SPA)** completa
 
 ### Configuración Automática con GitHub Actions
 
-El repositorio incluye un workflow oficial preconfigurado en [`.github/workflows/deploy.yml`](file:///.github/workflows/deploy.yml) que compila y publica la web automáticamente en cada `git push` a la rama `main`.
+El repositorio incluye un workflow oficial preconfigurado en [`.github/workflows/deploy.yml`](file:///.github/workflows/deploy.yml) que compila y publica la web automáticamente en cada `git push` a las ramas `master` o `main`.
 
 #### Pasos para activarlo en tu repositorio de GitHub:
 
@@ -44,10 +60,10 @@ El repositorio incluye un workflow oficial preconfigurado en [`.github/workflows
 2. En el menú lateral izquierdo, selecciona **Pages** (dentro de la sección *Code and automation*).
 3. En el apartado **Build and deployment**:
    - En **Source**, selecciona el desplegable y elige **GitHub Actions**.
-4. ¡Listo! Haz un `git push` a la rama `main` (o pulsa *Run workflow* en la pestaña **Actions**).
+4. ¡Listo! Haz un `git push` a la rama `master` (o pulsa *Run workflow* en la pestaña **Actions**).
 5. GitHub compilará el proyecto (`npm run build`) y desplegará la web en:
    ```
-   https://<tu-usuario-o-organizacion>.github.io/<nombre-del-repositorio>/
+   https://carloscanale81.github.io/ordomati/
    ```
 
 > [!NOTE]
@@ -201,7 +217,7 @@ npm install
 # Iniciar servidor de desarrollo web con Vite HMR (http://localhost:5173)
 npm run dev
 
-# Ejecutar la suite completa de pruebas unitarias (22 tests)
+# Ejecutar la suite completa de pruebas unitarias e integración (63 tests)
 npm test
 
 # Iniciar todos los servicios en local (Web + MCP + API)
@@ -213,6 +229,11 @@ npm run build
 
 ---
 
-## 📄 Licencia
+## 📄 Licencia y Propiedad Intelectual
 
-Este proyecto está desarrollado para la toma de decisiones multicriterio y el análisis de relaciones de orden. Distribuido bajo licencia de código abierto.
+&copy; 2026 **Carlos Caño Alegre** ([www.carloscanoalegre.com](https://www.carloscanoalegre.com)).
+
+Este proyecto y su desarrollo metodológico están protegidos bajo la **Licencia Internacional Creative Commons Atribución-NoComercial 4.0 ([CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/deed.es))**:
+
+* ✅ **Uso Académico y Reproducción:** Permitida citando debidamente la autoría original de Carlos Caño Alegre y las fuentes académicas asociadas ([TESEO](https://aplicaciones.ciencia.gob.es/teseo/#/tesis/O397308/detalle) / [BULERIA](https://buleria.unileon.es/entities/publication/1431d535-a1a1-4e2c-9254-6b85d7bfa1e8)).
+* 🚫 **Uso Comercial:** Queda estrictamente prohibido cualquier uso o explotación con fines comerciales sin la autorización previa y por escrito del autor.
