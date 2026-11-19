@@ -53,9 +53,20 @@ function apiDevServerPlugin(): Plugin {
   };
 }
 
+const buildVersion = (() => {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+})();
+
+process.env.VITE_APP_BUILD_VERSION = buildVersion;
+
 export default defineConfig({
   plugins: [react(), apiDevServerPlugin()],
   base: './',
+  define: {
+    'import.meta.env.VITE_APP_BUILD_VERSION': JSON.stringify(buildVersion)
+  },
   server: {
     proxy: {
       '/api': {

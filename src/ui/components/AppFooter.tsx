@@ -1,6 +1,7 @@
 import React, { forwardRef, useEffect, useState } from 'react';
 import { Globe } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
+import { APP_BUILD_VERSION } from '../../logic';
 
 export interface AppFooterProps {
   className?: string;
@@ -148,7 +149,15 @@ export const AppFooter = forwardRef<HTMLElement, AppFooterProps>(
           {/* Author domain & Copyright notice */}
           <div className="space-y-1.5 text-center">
             <div className="flex flex-col items-center gap-0.5 text-gray-800 dark:text-gray-200 font-bold text-[11px]">
-              <span>&copy; {currentYear} Carlos Caño Alegre</span>
+              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                <span>&copy; {currentYear} Carlos Caño Alegre</span>
+                <span
+                  className="font-mono text-[9px] font-normal text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded border border-gray-200 dark:border-gray-700 select-all"
+                  title={`Versión: ${APP_BUILD_VERSION}`}
+                >
+                  v{APP_BUILD_VERSION}
+                </span>
+              </div>
               <a
                 href="https://www.carloscanoalegre.com"
                 target="_blank"
@@ -182,6 +191,13 @@ export const AppFooter = forwardRef<HTMLElement, AppFooterProps>(
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-gray-800 dark:text-gray-200 font-bold text-xs">
               <span className="inline-flex items-center gap-1.5">
                 <span>&copy; {currentYear} Carlos Caño Alegre</span>
+              </span>
+              <span className="text-gray-300 dark:text-gray-700">·</span>
+              <span
+                className="font-mono text-[10px] font-normal text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 select-all"
+                title={`Versión: ${APP_BUILD_VERSION}`}
+              >
+                v{APP_BUILD_VERSION}
               </span>
               <span className="text-gray-300 dark:text-gray-700">·</span>
               <a

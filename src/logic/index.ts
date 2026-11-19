@@ -9,3 +9,4 @@ export * from './matchScraper';
 export * from './soccerAnalysis';
 export * from './teamColors';
 export * from './mathExpression';
+export * from './version';
