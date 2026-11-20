@@ -12,6 +12,8 @@ const teseoIcon = `${import.meta.env.BASE_URL}favicons/teseo.png`;
 const buleriaIcon = `${import.meta.env.BASE_URL}favicons/buleria.png`;
 const THESIS_DIRECT_DOWNLOAD_URL =
   'https://buleria.unileon.es/server/api/core/bitstreams/4ccec1fb-a72e-4e8a-9ac2-556f5260bcaa/content';
+const LICENSE_URL =
+  'https://github.com/carloscanale81/ordomati?tab=License-1-ov-file';
 
 /**
  * Hook to detect whether the right container's footer is currently visible within its scrollable root.
@@ -183,9 +185,32 @@ export const AppFooter = forwardRef<HTMLElement, AppFooterProps>(
             </div>
 
             <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-              {isEs
-                ? 'Licencia CC BY-NC 4.0 Internacional. Reproducción permitida citando autoría original de Carlos Caño Alegre. Prohibido uso comercial sin autorización.'
-                : 'CC BY-NC 4.0 License. Attribution to Carlos Caño Alegre required. Commercial use strictly prohibited without written authorization.'}
+              {isEs ? (
+                <>
+                  Licencia{' '}
+                  <a
+                    href={LICENSE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+                  >
+                    CC BY-NC 4.0
+                  </a>{' '}
+                  Internacional. Reproducción permitida citando autoría original de Carlos Caño Alegre. Prohibido uso comercial sin autorización.
+                </>
+              ) : (
+                <>
+                  <a
+                    href={LICENSE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+                  >
+                    CC BY-NC 4.0
+                  </a>{' '}
+                  License. Attribution to Carlos Caño Alegre required. Commercial use strictly prohibited without written authorization.
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -225,9 +250,33 @@ export const AppFooter = forwardRef<HTMLElement, AppFooterProps>(
             </div>
 
             <p className="text-[11px] text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed">
-              {isEs
-                ? 'Licencia Creative Commons Atribución-NoComercial 4.0 Internacional (CC BY-NC 4.0). Se permite la reproducción, distribución y comunicación pública citando la autoría original de Carlos Caño Alegre. Queda expresamente prohibido su uso con fines comerciales o lucrativos sin autorización previa por escrito.'
-                : 'Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0) License. Reproduction and distribution permitted with attribution to Carlos Caño Alegre. Commercial or lucrative use strictly prohibited without prior written authorization.'}
+              {isEs ? (
+                <>
+                  Licencia Creative Commons Atribución-NoComercial 4.0 Internacional (
+                  <a
+                    href={LICENSE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+                  >
+                    CC BY-NC 4.0
+                  </a>
+                  ). Se permite la reproducción, distribución y comunicación pública citando la autoría original de Carlos Caño Alegre. Queda expresamente prohibido su uso con fines comerciales o lucrativos sin autorización previa por escrito.
+                </>
+              ) : (
+                <>
+                  Creative Commons Attribution-NonCommercial 4.0 International (
+                  <a
+                    href={LICENSE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+                  >
+                    CC BY-NC 4.0
+                  </a>
+                  ) License. Reproduction and distribution permitted with attribution to Carlos Caño Alegre. Commercial or lucrative use strictly prohibited without prior written authorization.
+                </>
+              )}
             </p>
           </div>
 

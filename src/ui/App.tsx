@@ -35,6 +35,7 @@ import { MainNavMenu } from './components/MainNavMenu';
 import { NavStatusBadges } from './components/NavStatusBadges';
 import { FlavourPage } from './components/FlavourPage';
 import { FunctionSyntaxPage } from './components/FunctionSyntaxPage';
+import { IntroPage } from './components/IntroPage';
 import { AppFooter, useIsFooterVisible } from './components/AppFooter';
 import { ThemeProvider } from './theme/ThemeContext';
 import { ConfigPhase } from './phases/ConfigPhase';
@@ -52,7 +53,7 @@ function AppContent() {
   }, [language, t]);
   const [activePhase, setActivePhase] = useState<number>(0);
   const [activeCharIdx, setActiveCharIdx] = useState<number>(0);
-  const [activeView, setActiveView] = useState<AppMenuView>('ordomachine');
+  const [activeView, setActiveView] = useState<AppMenuView>('intro');
   const [flavourCases, setFlavourCases] = useState<Record<FlavourId, FlavourAnalysisCase>>(() => ({
     'match-soccer-mvp': createInitialFlavourState('match-soccer-mvp')
   }));
@@ -559,9 +560,12 @@ function AppContent() {
         </div>
       )}
 
-      {/* FUNCTION SYNTAX DOCUMENTATION VIEW (WITH LEFT SIDEBAR FOOTER INFO) */}
-      {activeView === 'function-syntax' && (
-        <FunctionSyntaxPage isSidebarOpen={isSidebarOpen} />
+      {/* INTRODUCTORY DIDACTIC PAGE VIEW (WITH LEFT SIDEBAR NAVIGATION) */}
+      {(activeView === 'intro' || activeView === 'function-syntax') && (
+        <IntroPage
+          isSidebarOpen={isSidebarOpen}
+          onNavigateToOrdomachine={() => setActiveView('ordomachine')}
+        />
       )}
 
       {/* FLAVOUR WORKSPACE VIEWS */}

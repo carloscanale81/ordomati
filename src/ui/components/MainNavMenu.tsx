@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Code2, Cpu, FileText } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, Code2, Cpu, FileText } from 'lucide-react';
 import { AppMenuView, FLAVOUR_LIST, FlavourId, isFlavourId } from '../../logic/flavours';
 import { FlavourIllustration } from './FlavourWatermark';
 import { getCaseExamples, getAllFlavourExamples, extractExampleDescription } from '../../logic/examples';
@@ -175,6 +175,39 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
   return (
     <nav aria-label={t('header.mainNav')} className="flex items-center gap-1 sm:gap-2">
       <div className="h-5 w-px bg-gray-200 dark:bg-gray-700 mx-1 sm:mx-2" />
+
+      {/* Introduction view (Didactic Guide & Theoretical Framework) */}
+      <button
+        type="button"
+        onClick={() => {
+          clearFlavoursTimeout();
+          clearOrdomachineTimeout();
+          setIsFlavoursOpen(false);
+          setIsOrdomachineOpen(false);
+          onSelectView('intro');
+        }}
+        onMouseEnter={() => {
+          clearFlavoursTimeout();
+          clearOrdomachineTimeout();
+          setIsFlavoursOpen(false);
+          setIsOrdomachineOpen(false);
+        }}
+        aria-current={activeView === 'intro' ? 'page' : undefined}
+        className={`${navItemBaseClass} ${
+          activeView === 'intro'
+            ? 'text-blue-600 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-950/35'
+            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100/75 dark:hover:bg-gray-800/70'
+        }`}
+      >
+        <BookOpen className="w-3.5 h-3.5" />
+        <span>{t('header.menu.intro')}</span>
+        {activeView === 'intro' && (
+          <span
+            aria-hidden="true"
+            className="absolute left-2.5 right-2.5 -bottom-1 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400"
+          />
+        )}
+      </button>
 
       {/* Main Ordomachine view + Examples Submenu */}
       <div
@@ -428,39 +461,6 @@ export const MainNavMenu: React.FC<MainNavMenuProps> = ({
           </div>
         )}
       </div>
-
-      {/* Function Syntax Documentation view */}
-      <button
-        type="button"
-        onClick={() => {
-          clearFlavoursTimeout();
-          clearOrdomachineTimeout();
-          setIsFlavoursOpen(false);
-          setIsOrdomachineOpen(false);
-          onSelectView('function-syntax');
-        }}
-        onMouseEnter={() => {
-          clearFlavoursTimeout();
-          clearOrdomachineTimeout();
-          setIsFlavoursOpen(false);
-          setIsOrdomachineOpen(false);
-        }}
-        aria-current={activeView === 'function-syntax' ? 'page' : undefined}
-        className={`${navItemBaseClass} ${
-          activeView === 'function-syntax'
-            ? 'text-blue-600 dark:text-blue-400 bg-blue-50/70 dark:bg-blue-950/35'
-            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100/75 dark:hover:bg-gray-800/70'
-        }`}
-      >
-        <Code2 className="w-3.5 h-3.5" />
-        <span>{t('header.menu.functionSyntax')}</span>
-        {activeView === 'function-syntax' && (
-          <span
-            aria-hidden="true"
-            className="absolute left-2.5 right-2.5 -bottom-1 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400"
-          />
-        )}
-      </button>
     </nav>
   );
 };
