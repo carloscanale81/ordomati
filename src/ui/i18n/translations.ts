@@ -418,7 +418,7 @@ export const translations = {
     'agg.card.rankTooltip': 'Position #{rank} in global ranking',
 
     // Flavours Workspace & Analysis Controls
-    'flavours.badge': 'Competition',
+    'flavours.badge': 'Sport',
     'flavours.analysisControls.title': 'Analysis Controls',
     'flavours.analysisControls.subtitle': 'Configure the source URL for data extraction, export or import the case file, and download a readable analysis report.',
     'flavours.analysisControls.sourceUrl': 'Source Data URL',
@@ -1113,7 +1113,7 @@ export const translations = {
     'agg.card.rankTooltip': 'Posición #{rank} en el ranking global',
 
     // Espacio Sabores y Controles del Análisis
-    'flavours.badge': 'Competición',
+    'flavours.badge': 'Deporte',
     'flavours.analysisControls.title': 'Controles del Análisis',
     'flavours.analysisControls.subtitle': 'Configura la URL de origen para extraer información, exporta o importa el caso y descarga un informe legible del análisis.',
     'flavours.analysisControls.sourceUrl': 'URL origen de información',
