@@ -660,6 +660,10 @@ export const translations = {
     'soccer.integral.cumulativeAffinityTitle': 'Cumulative Contextual Affinity',
     'soccer.integral.cumulativePassDebug': 'Debug: Cumulative pass / distance matrix (base count)',
     'soccer.integral.hideCumulativePassDebug': 'Hide cumulative pass / distance debug',
+    'soccer.integral.expandAffinity': 'Expand contextual affinity matrix',
+    'soccer.integral.closeAffinity': 'Close affinity card',
+    'soccer.integral.noActivePlayers': 'No active players for this team at the selected minute',
+    'common.close': 'Close',
 
     // Soccer MVP - Player Detailed Card & Segment Breakdown
     'soccer.playerCard.expand': 'View player details',
@@ -1351,6 +1355,10 @@ export const translations = {
     'soccer.integral.cumulativeAffinityTitle': 'Afinidad Contextual Acumulada',
     'soccer.integral.cumulativePassDebug': 'Depuración: Matriz de pases / distancia acumulada (conteo base)',
     'soccer.integral.hideCumulativePassDebug': 'Ocultar depuración de pases / distancia acumulada',
+    'soccer.integral.expandAffinity': 'Ampliar matriz de afinidad contextual',
+    'soccer.integral.closeAffinity': 'Cerrar tarjeta de afinidad',
+    'soccer.integral.noActivePlayers': 'No hay jugadores activos para este equipo en el minuto seleccionado',
+    'common.close': 'Cerrar',
 
     // Soccer MVP - Player Detailed Card & Segment Breakdown
     'soccer.playerCard.expand': 'Ver ficha detallada',
