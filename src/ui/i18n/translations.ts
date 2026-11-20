@@ -5,6 +5,8 @@ export const translations = {
     // Header & Navigation
     'app.title': 'Ordomatics',
     'header.mainNav': 'Main navigation',
+    'header.menu.intro': 'Introduction',
+    'header.menu.introDesc': 'Theoretical framework & foundational guide',
     'header.menu.ordomachine': 'Ordomachine',
     'header.menu.examples': 'Example Cases',
     'header.menu.currentWorkspace': 'Current Workspace',
@@ -700,6 +702,8 @@ export const translations = {
     // Header & Navigation
     'app.title': 'Ordomática',
     'header.mainNav': 'Navegación principal',
+    'header.menu.intro': 'Introducción',
+    'header.menu.introDesc': 'Marco teórico y fundamentos conceptuales',
     'header.menu.ordomachine': 'Ordomáquina',
     'header.menu.examples': 'Casos de Ejemplo',
     'header.menu.currentWorkspace': 'Espacio de trabajo actual',

@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GraduationCap, Construction, ExternalLink } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 
-const BULERIA_THESIS_URL =
-  'https://buleria.unileon.es/entities/publication/1431d535-a1a1-4e2c-9254-6b85d7bfa1e8';
+const THESIS_DIRECT_DOWNLOAD_URL =
+  'https://buleria.unileon.es/server/api/core/bitstreams/4ccec1fb-a72e-4e8a-9ac2-556f5260bcaa/content';
 
 export const NavStatusBadges: React.FC = () => {
   const { t } = useI18n();
@@ -67,7 +67,7 @@ export const NavStatusBadges: React.FC = () => {
         >
           <span>{t('header.academicBadgePrefix')}</span>
           <a
-            href={BULERIA_THESIS_URL}
+            href={THESIS_DIRECT_DOWNLOAD_URL}
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}

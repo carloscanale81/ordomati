@@ -11,7 +11,7 @@ export type FlavourId = 'match-soccer-mvp';
 /**
  * Top-level navigation view identifiers across the application.
  */
-export type AppMenuView = 'ordomachine' | 'function-syntax' | FlavourId;
+export type AppMenuView = 'intro' | 'ordomachine' | 'function-syntax' | FlavourId;
 
 /**
  * Visual watermark illustration variant rendered behind flavour views.
