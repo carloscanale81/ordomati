@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Network, Table, ChevronDown, ChevronUp, Database, Shield } from 'lucide-react';
+import { Network, Table, ChevronDown, ChevronUp, Database, Shield, X } from 'lucide-react';
 import { MatchPlayer, SoccerTimelineResult } from '../../logic/soccerAnalysis';
 import { useI18n } from '../i18n/I18nContext';
 import { SoccerPitchGraph } from './SoccerPitchGraph';
@@ -13,6 +13,7 @@ export interface SoccerIntegralAffinityPanelProps {
   selectedTeam: 'home' | 'away';
   onSelectTeam: (team: 'home' | 'away') => void;
   className?: string;
+  onClose?: () => void;
 }
 
 export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelProps> = ({
@@ -23,7 +24,8 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
   currentMinute,
   selectedTeam,
   onSelectTeam,
-  className = ''
+  className = '',
+  onClose
 }) => {
   const { t } = useI18n();
   const [viewMode, setViewMode] = useState<'matrix' | 'graph'>('graph');
@@ -139,6 +141,20 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
               <span>{t('soccer.dimension.modeGraph')}</span>
             </button>
           </div>
+
+          {/* Close button to hide the expanded panel */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              title={t('soccer.integral.closeAffinity')}
+              aria-label={t('soccer.integral.closeAffinity')}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border border-gray-200 dark:border-gray-700 transition-all cursor-pointer shadow-2xs"
+            >
+              <X className="w-4 h-4 text-gray-500 hover:text-red-600 dark:hover:text-red-400 shrink-0" />
+              <span>{t('common.close')}</span>
+            </button>
+          )}
         </div>
       </div>
 

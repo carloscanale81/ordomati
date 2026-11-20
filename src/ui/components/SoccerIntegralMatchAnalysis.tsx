@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Trophy,
   Sliders,
@@ -8,11 +8,13 @@ import {
   FastForward,
   Rewind,
   Sparkles,
-  Layers
+  Layers,
+  Maximize2
 } from 'lucide-react';
 import { Card } from './Card';
 import { SoccerIntegralAffinityPanel } from './SoccerIntegralAffinityPanel';
 import { SoccerIntegralPlayerCard } from './SoccerIntegralPlayerCard';
+import { SoccerPitchGraph } from './SoccerPitchGraph';
 import { ErrorBoundary } from './ErrorBoundary';
 import {
   SoccerTimelineResult,
@@ -62,6 +64,8 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
   );
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [selectedAffinityTeam, setSelectedAffinityTeam] = useState<'home' | 'away'>('home');
+  const [isAffinityExpanded, setIsAffinityExpanded] = useState<boolean>(false);
+  const expandedAffinityRef = useRef<HTMLDivElement>(null);
   const [expandedPlayerKeys, setExpandedPlayerKeys] = useState<Set<number | string>>(new Set());
   const [playerSegmentSelection, setPlayerSegmentSelection] = useState<Record<number | string, string | null>>({});
 
@@ -132,11 +136,11 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
       ? synergyConfigs['dribblesWon'] || { type: 'factor', k: 1.0 }
       : synergyConfigs[selectedConceptOrAgg] || { type: 'factor', k: 1.0 };
 
-  const cumulativeAffinity = useMemo(() => {
+  const homeCumulativeAffinity = useMemo(() => {
     return computeIntegralCumulativeAffinity(
       timeline,
       matchData,
-      selectedAffinityTeam,
+      'home',
       activeSynergyConfig,
       effectiveSliderMinute,
       propagationConfig,
@@ -145,12 +149,41 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
   }, [
     timeline,
     matchData,
-    selectedAffinityTeam,
     activeSynergyConfig,
     effectiveSliderMinute,
     propagationConfig,
     blockingConfig
   ]);
+
+  const awayCumulativeAffinity = useMemo(() => {
+    return computeIntegralCumulativeAffinity(
+      timeline,
+      matchData,
+      'away',
+      activeSynergyConfig,
+      effectiveSliderMinute,
+      propagationConfig,
+      blockingConfig
+    );
+  }, [
+    timeline,
+    matchData,
+    activeSynergyConfig,
+    effectiveSliderMinute,
+    propagationConfig,
+    blockingConfig
+  ]);
+
+  const cumulativeAffinity =
+    selectedAffinityTeam === 'home' ? homeCumulativeAffinity : awayCumulativeAffinity;
+
+  const handleOpenAffinity = (team: 'home' | 'away') => {
+    setSelectedAffinityTeam(team);
+    setIsAffinityExpanded(true);
+    setTimeout(() => {
+      expandedAffinityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  };
 
   const { homePlayers, awayPlayers, homeMvp, awayMvp, matchMvp, convergentCutPoints } =
     analysisResult;
@@ -300,16 +333,21 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
           </div>
         )}
 
-        {/* Cumulative Contextual Affinity Matrix Panel (colocado entre la indicación de MVP general y la línea temporal) */}
-        <SoccerIntegralAffinityPanel
-          timeline={timeline}
-          players={cumulativeAffinity.players}
-          AC_cum={cumulativeAffinity.AC_cum}
-          pass_cum={cumulativeAffinity.pass_cum}
-          currentMinute={sliderMinute}
-          selectedTeam={selectedAffinityTeam}
-          onSelectTeam={setSelectedAffinityTeam}
-        />
+        {/* Cumulative Contextual Affinity Matrix Panel (colocado entre la indicación de MVP general y la línea temporal al ampliarse) */}
+        {isAffinityExpanded && (
+          <div ref={expandedAffinityRef} className="animate-in fade-in zoom-in-95 duration-200">
+            <SoccerIntegralAffinityPanel
+              timeline={timeline}
+              players={cumulativeAffinity.players}
+              AC_cum={cumulativeAffinity.AC_cum}
+              pass_cum={cumulativeAffinity.pass_cum}
+              currentMinute={sliderMinute}
+              selectedTeam={selectedAffinityTeam}
+              onSelectTeam={setSelectedAffinityTeam}
+              onClose={() => setIsAffinityExpanded(false)}
+            />
+          </div>
+        )}
 
         {/* Unified Convergent Timeline Bar with Movable Scrubber */}
         <div className="p-4 rounded-xl bg-gray-50/80 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-800 space-y-3">
@@ -497,6 +535,41 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
               )}
             </div>
 
+            {/* Thumbnail Reducido de Matriz de Afinidad Contextual del Equipo Local */}
+            <div className="relative mb-3 rounded-xl overflow-hidden border border-gray-200/90 dark:border-gray-800 bg-linear-to-b from-gray-900 via-slate-900 to-black shadow-xs group">
+              <div
+                onClick={() => handleOpenAffinity('home')}
+                className="cursor-pointer transition-transform duration-200 hover:scale-[1.01]"
+                title={t('soccer.integral.expandAffinity')}
+              >
+                {homeCumulativeAffinity.players.length > 0 ? (
+                  <SoccerPitchGraph
+                    players={homeCumulativeAffinity.players}
+                    matrix={homeCumulativeAffinity.AC_cum}
+                    teamKey="home"
+                    teamName={timeline.homeTeamName}
+                    crestUrl={timeline.homeCrestUrl}
+                    className="!rounded-xl !border-0 !shadow-none !max-w-none pointer-events-none"
+                  />
+                ) : (
+                  <div className="p-4 text-center text-xs text-gray-400">
+                    {t('soccer.integral.noActivePlayers')}
+                  </div>
+                )}
+              </div>
+
+              {/* Botón icono de ampliación en la esquina superior derecha */}
+              <button
+                type="button"
+                onClick={() => handleOpenAffinity('home')}
+                title={t('soccer.integral.expandAffinity')}
+                aria-label={t('soccer.integral.expandAffinity')}
+                className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-black/60 hover:bg-black/85 text-white/90 hover:text-white backdrop-blur-xs transition-all shadow-md cursor-pointer hover:scale-105 border border-white/20"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            </div>
+
             {/* Player Performance Cards List */}
             <div className="space-y-2 flex-1 overflow-y-auto pr-1">
               {homePlayers.map((item, idx) => {
@@ -548,6 +621,41 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
                   <span>MVP: {awayMvp.player.name}</span>
                 </div>
               )}
+            </div>
+
+            {/* Thumbnail Reducido de Matriz de Afinidad Contextual del Equipo Visitante */}
+            <div className="relative mb-3 rounded-xl overflow-hidden border border-gray-200/90 dark:border-gray-800 bg-linear-to-b from-gray-900 via-slate-900 to-black shadow-xs group">
+              <div
+                onClick={() => handleOpenAffinity('away')}
+                className="cursor-pointer transition-transform duration-200 hover:scale-[1.01]"
+                title={t('soccer.integral.expandAffinity')}
+              >
+                {awayCumulativeAffinity.players.length > 0 ? (
+                  <SoccerPitchGraph
+                    players={awayCumulativeAffinity.players}
+                    matrix={awayCumulativeAffinity.AC_cum}
+                    teamKey="away"
+                    teamName={timeline.awayTeamName}
+                    crestUrl={timeline.awayCrestUrl}
+                    className="!rounded-xl !border-0 !shadow-none !max-w-none pointer-events-none"
+                  />
+                ) : (
+                  <div className="p-4 text-center text-xs text-gray-400">
+                    {t('soccer.integral.noActivePlayers')}
+                  </div>
+                )}
+              </div>
+
+              {/* Botón icono de ampliación en la esquina superior derecha */}
+              <button
+                type="button"
+                onClick={() => handleOpenAffinity('away')}
+                title={t('soccer.integral.expandAffinity')}
+                aria-label={t('soccer.integral.expandAffinity')}
+                className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-black/60 hover:bg-black/85 text-white/90 hover:text-white backdrop-blur-xs transition-all shadow-md cursor-pointer hover:scale-105 border border-white/20"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Player Performance Cards List */}
