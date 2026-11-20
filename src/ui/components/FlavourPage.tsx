@@ -1083,9 +1083,11 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                 <span className="inline-flex flex-wrap items-center gap-2">
                   <span>{t('header.menu.ordomachine')}</span>
                   <span>{t(textKeys.titleKey)}</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/70">
-                    {t('flavours.badge')}
-                  </span>
+                </span>
+              }
+              action={
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/70">
+                  {t('flavours.badge')}
                 </span>
               }
               icon={SlidersHorizontal}
