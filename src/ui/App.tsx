@@ -53,7 +53,42 @@ function AppContent() {
   }, [language, t]);
   const [activePhase, setActivePhase] = useState<number>(0);
   const [activeCharIdx, setActiveCharIdx] = useState<number>(0);
-  const [activeView, setActiveView] = useState<AppMenuView>('intro');
+  const [activeView, setActiveView] = useState<AppMenuView>(() => {
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#importMatch=')) {
+      return 'match-soccer-mvp';
+    }
+    return 'intro';
+  });
+
+  // Listen for bookmarklet import hash or postMessage at top-level App to ensure routing to Ordoexperto Soccer
+  useEffect(() => {
+    const handleCheckImportHash = () => {
+      try {
+        if (typeof window !== 'undefined' && window.location.hash.startsWith('#importMatch=')) {
+          setActiveView('match-soccer-mvp');
+        }
+      } catch (err) {
+        console.warn('Error reading importMatch hash in App', err);
+      }
+    };
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'ORDOMATI_INGEST_MATCH') {
+        setActiveView('match-soccer-mvp');
+      }
+    };
+
+    window.addEventListener('hashchange', handleCheckImportHash);
+    window.addEventListener('message', handleMessage);
+
+    // Also check on mount
+    handleCheckImportHash();
+
+    return () => {
+      window.removeEventListener('hashchange', handleCheckImportHash);
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
   const [flavourCases, setFlavourCases] = useState<Record<FlavourId, FlavourAnalysisCase>>(() => ({
     'match-soccer-mvp': createInitialFlavourState('match-soccer-mvp')
   }));

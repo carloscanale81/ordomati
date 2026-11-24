@@ -16,6 +16,7 @@ export interface ScrapeMatchResult {
   source: 'live-scraped' | 'match-recreation' | 'manual';
   isTestData?: boolean;
   error?: string;
+  errorDetails?: string;
 }
 
 /**
@@ -1307,6 +1308,7 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
   }
 
   // 1. In Node.js runtime, attempt authentic browser / live HTTP fetch for WhoScored match URLs
+  let scrapeErrorDetails: string = '';
   const isNode = typeof window === 'undefined';
   if (isNode) {
     try {
@@ -1386,8 +1388,8 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
             }
           }
         }
-      } catch {
-        // Continue to HTTP fetch fallback
+      } catch (browserErr: any) {
+        scrapeErrorDetails += `[Browser Execution]: ${browserErr?.message || String(browserErr)}\n`;
       }
 
       // 1b. Try HTTP fetch with legitimate browser headers
@@ -1427,10 +1429,96 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
             source: 'live-scraped',
             isTestData: false
           };
+        } else {
+          scrapeErrorDetails += `[HTTP Fetch]: Status 200 OK pero el contenido HTML recibido no contenía 'matchCentreData' (posible pantalla de validación anti-bot/Cloudflare o estructura diferente).\n`;
         }
+      } else {
+        scrapeErrorDetails += `[HTTP Fetch]: Error HTTP ${res.status} ${res.statusText} al conectar con ${trimmed}.\n`;
       }
-    } catch {
-      // Network error, timeout or anti-bot challenge fallback
+    } catch (httpErr: any) {
+      scrapeErrorDetails += `[HTTP Fetch Exception]: ${httpErr?.message || String(httpErr)}\n`;
+    }
+  } else {
+    // Client-side browser runtime: direct cross-origin fetch is subject to CORS or anti-bot
+    try {
+      const res = await fetch(trimmed, {
+        headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+        signal: AbortSignal.timeout(6000)
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const extracted = extractMatchCentreDataFromHtml(html);
+        if (extracted && (extracted.home || extracted.players || extracted.events || extracted.matchId)) {
+          enrichMatchDataWithMetadata(extracted, trimmed, html);
+          const mId = typeof extracted.matchId === 'number' ? extracted.matchId : parsedUrlMatchId;
+          extracted.matchId = mId;
+          return {
+            success: true,
+            matchId: mId,
+            matchTitle: (extracted.matchTitle as string) || (mId ? `Match ${mId}` : 'WhoScored Match Data'),
+            matchData: extracted,
+            jsonString: JSON.stringify(extracted, null, 2),
+            source: 'live-scraped',
+            isTestData: false
+          };
+        }
+      } else {
+        scrapeErrorDetails += `[Client Browser Fetch]: Error HTTP ${res.status} ${res.statusText}.\n`;
+      }
+    } catch (clientErr: any) {
+      scrapeErrorDetails += `[Client Browser Fetch / CORS Restriction]: ${clientErr?.message || String(clientErr)} (las peticiones HTTP directas desde el navegador a dominios externos están bloqueadas por políticas CORS o Cloudflare anti-bot).\n`;
+    }
+
+    // Multi-channel transparent CORS proxy cascade (ideal for client-side environments such as GitHub Pages)
+    const clientProxies = [
+      {
+        name: 'corsproxy.io',
+        url: `https://corsproxy.io/?url=${encodeURIComponent(trimmed)}`,
+        headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }
+      },
+      {
+        name: 'allorigins.win',
+        url: `https://api.allorigins.win/raw?url=${encodeURIComponent(trimmed)}`,
+        headers: { 'Accept': 'text/html,application/json,text/plain,*/*' }
+      },
+      {
+        name: 'codetabs.com',
+        url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(trimmed)}`,
+        headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }
+      }
+    ];
+
+    for (const proxy of clientProxies) {
+      try {
+        const proxyRes = await fetch(proxy.url, {
+          headers: proxy.headers,
+          signal: AbortSignal.timeout(9000)
+        });
+        if (proxyRes.ok) {
+          const proxyHtml = await proxyRes.text();
+          const extracted = extractMatchCentreDataFromHtml(proxyHtml);
+          if (extracted && (extracted.home || extracted.players || extracted.events || extracted.matchId)) {
+            enrichMatchDataWithMetadata(extracted, trimmed, proxyHtml);
+            const mId = typeof extracted.matchId === 'number' ? extracted.matchId : parsedUrlMatchId;
+            extracted.matchId = mId;
+            return {
+              success: true,
+              matchId: mId,
+              matchTitle: (extracted.matchTitle as string) || (mId ? `Match ${mId}` : 'WhoScored Match Data'),
+              matchData: extracted,
+              jsonString: JSON.stringify(extracted, null, 2),
+              source: 'live-scraped',
+              isTestData: false
+            };
+          } else {
+            scrapeErrorDetails += `[Proxy ${proxy.name}]: Respuesta 200 OK recibida pero no contiene 'matchCentreData' (posible bloqueo WAF).\n`;
+          }
+        } else {
+          scrapeErrorDetails += `[Proxy ${proxy.name}]: Error HTTP ${proxyRes.status} ${proxyRes.statusText}.\n`;
+        }
+      } catch (proxyErr: any) {
+        scrapeErrorDetails += `[Proxy ${proxy.name}]: ${proxyErr?.message || String(proxyErr)}\n`;
+      }
     }
   }
 
@@ -1447,7 +1535,8 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
       matchData,
       jsonString: JSON.stringify(matchData, null, 2),
       source: 'match-recreation',
-      isTestData: true
+      isTestData: true,
+      errorDetails: scrapeErrorDetails.trim() || undefined
     };
   }
 
@@ -1461,6 +1550,7 @@ export const scrapeMatchData = async (url: string): Promise<ScrapeMatchResult> =
     matchData,
     jsonString: JSON.stringify(matchData, null, 2),
     source: 'match-recreation',
-    isTestData: true
+    isTestData: true,
+    errorDetails: scrapeErrorDetails.trim() || undefined
   };
 };

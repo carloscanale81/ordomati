@@ -100,6 +100,7 @@ const FLAVOUR_TEXT_KEYS: Record<
 interface StatusNotice {
   kind: 'success' | 'error' | 'warning';
   message: string;
+  details?: string;
 }
 
 /**
@@ -120,9 +121,13 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   const rightFooterRef = useRef<HTMLElement>(null);
   const isRightFooterVisible = useIsFooterVisible(mainScrollRef, rightFooterRef);
   const [notice, setNotice] = useState<StatusNotice | null>(null);
+  const [isNoticeDetailsExpanded, setIsNoticeDetailsExpanded] = useState<boolean>(false);
   const [isScraping, setIsScraping] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isJsonExpanded, setIsJsonExpanded] = useState<boolean>(false);
+  const [isNewAnalysisConfirmOpen, setIsNewAnalysisConfirmOpen] = useState<boolean>(false);
+  const [isUrlSectionRevealed, setIsUrlSectionRevealed] = useState<boolean>(false);
+  const [isUrlInteracted, setIsUrlInteracted] = useState<boolean>(false);
 
   // Soccer MVP specific state: tabs, timeline segment, calculation status, synergy, OWA & dim affinity
   const isSoccerFlavour = flavourCase.flavour === 'match-soccer-mvp';
@@ -133,6 +138,170 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   const [isConfigCollapsed, setIsConfigCollapsed] = useState<boolean>(false);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(false);
   const [isAffinityCollapsed, setIsAffinityCollapsed] = useState<boolean>(false);
+
+  // Generate robust, valid javascript: bookmarklet string without nested escaping bugs
+  const whoScoredBookmarkletHref = useMemo(() => {
+    if (typeof window === 'undefined') return '#';
+    const targetAppUrl = window.location.origin + window.location.pathname;
+
+    const code = `(function(){
+  try {
+    var targetUrl = ${JSON.stringify(targetAppUrl)};
+    var d = window.matchCentreData;
+    if (!d && window.require && window.require.s && window.require.s.contexts && window.require.s.contexts._) {
+      var cfg = window.require.s.contexts._.config;
+      if (cfg && cfg.params && cfg.params.args) {
+        d = cfg.params.args.matchCentreData;
+      }
+    }
+    if (!d) {
+      var scripts = document.getElementsByTagName('script');
+      for (var i = 0; i < scripts.length; i++) {
+        var txt = scripts[i].textContent || scripts[i].innerText || '';
+        var pos = txt.indexOf('matchCentreData');
+        if (pos !== -1) {
+          var eq = txt.indexOf('=', pos);
+          var cl = txt.indexOf(':', pos);
+          var st = -1;
+          if (eq !== -1 && (cl === -1 || eq < cl)) {
+            st = txt.indexOf('{', eq);
+          } else if (cl !== -1) {
+            st = txt.indexOf('{', cl);
+          }
+          if (st !== -1) {
+            var depth = 0;
+            var inStr = false;
+            var strCh = '';
+            var esc = false;
+            for (var j = st; j < txt.length; j++) {
+              var ch = txt[j];
+              if (esc) { esc = false; continue; }
+              if (ch === '\\\\' && inStr) { esc = true; continue; }
+              if ((ch === '"' || ch === "'") && !esc) {
+                if (!inStr) { inStr = true; strCh = ch; }
+                else if (ch === strCh) { inStr = false; strCh = ''; }
+                continue;
+              }
+              if (!inStr) {
+                if (ch === '{') depth++;
+                else if (ch === '}') {
+                  depth--;
+                  if (depth === 0) {
+                    try {
+                      var parsed = JSON.parse(txt.substring(st, j + 1));
+                      if (parsed && (parsed.matchCentreData || parsed.home)) {
+                        d = parsed.matchCentreData || parsed;
+                        break;
+                      }
+                    } catch(e) {}
+                  }
+                }
+              }
+            }
+            if (d) break;
+          }
+        }
+      }
+    }
+    if (d) {
+      var payload = JSON.stringify({ sourceUrl: window.location.href, matchData: d });
+      var fullTarget = targetUrl + '#importMatch=' + encodeURIComponent(payload);
+      var banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:20px;right:20px;z-index:999999;background:#1e40af;color:#fff;padding:14px 20px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.3);font-family:sans-serif;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px;';
+      banner.innerHTML = '⚽ ¡Datos de WhoScored listos! Abriendo Ordomática...';
+      document.body.appendChild(banner);
+      setTimeout(function(){
+        try {
+          var w = window.open(fullTarget, '_blank');
+          if (w) { w.focus(); } else { window.location.href = fullTarget; }
+        } catch(e) {
+          window.location.href = fullTarget;
+        }
+      }, 500);
+    } else {
+      alert('⚠️ No se detectaron datos en esta pestaña. Asegúrate de estar en la vista Live de un partido de WhoScored.');
+    }
+  } catch(err) {
+    alert('Error al extraer datos: ' + err);
+  }
+})();`;
+
+    return 'javascript:' + encodeURI(code.replace(/\s+/g, ' ').trim());
+  }, []);
+
+  // Auto-ingest listener for bookmarklet data transfer (via localStorage, window.postMessage, or URL hash)
+  useEffect(() => {
+    if (!isSoccerFlavour) return;
+
+    const handlePayload = (sourceUrl: string, matchData: any) => {
+      try {
+        const cleanJson = JSON.stringify(matchData, null, 2);
+        setIsUrlInteracted(true);
+        onUpdateFlavourCase(prev => ({
+          ...prev,
+          sourceUrl: sourceUrl || prev.sourceUrl,
+          matchDataJson: cleanJson,
+          updatedAt: new Date().toISOString()
+        }));
+        setSoccerAnalysisCalculated(true);
+        setNotice({
+          kind: 'success',
+          message:
+            language === 'es'
+              ? '✅ Datos del partido importados automáticamente desde el ingestor web.'
+              : '✅ Match data automatically ingested from web ingestor.'
+        });
+      } catch (err) {
+        console.warn('Failed to parse ingested payload', err);
+      }
+    };
+
+    // 1. Check window.opener / postMessage communication
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'ORDOMATI_INGEST_MATCH' && e.data.matchData) {
+        handlePayload(e.data.sourceUrl || '', e.data.matchData);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    // 2. Check localStorage temporary exchange key
+    try {
+      const stored = localStorage.getItem('ordomati_pending_ingest');
+      if (stored) {
+        localStorage.removeItem('ordomati_pending_ingest');
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.matchData) {
+          handlePayload(parsed.sourceUrl || '', parsed.matchData);
+        }
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    // 3. Check hash payload (e.g. #importMatch=...)
+    const checkHash = () => {
+      try {
+        const hash = window.location.hash;
+        if (hash.startsWith('#importMatch=')) {
+          const rawPayload = decodeURIComponent(hash.slice('#importMatch='.length));
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          const parsed = JSON.parse(rawPayload);
+          if (parsed && (parsed.matchData || parsed.home)) {
+            handlePayload(parsed.sourceUrl || '', parsed.matchData || parsed);
+          }
+        }
+      } catch (err) {
+        console.warn('Error reading importMatch from hash', err);
+      }
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('hashchange', checkHash);
+    };
+  }, [isSoccerFlavour, language, onUpdateFlavourCase]);
   const [soccerAnalysisCalculated, setSoccerAnalysisCalculated] = useState<boolean>(true);
 
   // Global Pipeline Functions Config
@@ -506,6 +675,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   };
 
   const handleUrlChange = (nextUrl: string) => {
+    setIsUrlInteracted(true);
     onUpdateFlavourCase(prev => ({
       ...prev,
       sourceUrl: nextUrl,
@@ -637,15 +807,26 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
       const isTestDataLoaded = isRecreationSource || isIdMismatch || isTeamMismatch || isDummyData;
 
       if (isTestDataLoaded) {
+        setIsNoticeDetailsExpanded(false);
         setNotice({
           kind: 'warning',
           message: isIdMismatch || isTeamMismatch
             ? t('flavours.analysisControls.statusScrapedMismatchWarning', {
                 chars: jsonStr.length.toLocaleString(language)
               })
-            : t('flavours.analysisControls.statusScrapedFallbackWarning')
+            : t('flavours.analysisControls.statusScrapedFallbackWarning'),
+          details:
+            scrapeResult?.errorDetails ||
+            (isIdMismatch
+              ? `ID mismatch: URL indica ID ${urlMatchId} pero se cargaron datos correspondientes a ${loadedMatchId}.`
+              : isTeamMismatch
+              ? `Team mismatch: La URL no coincide con España vs Argentina pero se cargó el partido 2007644.`
+              : isDummyData
+              ? `Placeholder dummy data: Se detectaron nombres de jugadores simulados (P1, P2...).`
+              : 'Protección Cloudflare/anti-bot o red no disponible al intentar acceder al endpoint remoto.')
         });
       } else {
+        setIsNoticeDetailsExpanded(false);
         setNotice({
           kind: 'success',
           message: t('flavours.analysisControls.statusScrapedSuccess', {
@@ -654,9 +835,11 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
         });
       }
     } catch (err: any) {
+      setIsNoticeDetailsExpanded(false);
       setNotice({
         kind: 'error',
-        message: err?.message || 'Error al extraer información del partido.'
+        message: err?.message || 'Error al extraer información del partido.',
+        details: err?.stack || String(err)
       });
     } finally {
       setIsScraping(false);
@@ -897,12 +1080,15 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   const handleResetSoccerMatch = () => {
     onUpdateFlavourCase(prev => ({
       ...prev,
-      sourceUrl: '',
+      sourceUrl: DEFAULT_SOCCER_MATCH_URL,
       matchDataJson: undefined,
+      description: '',
       updatedAt: new Date().toISOString()
     }));
     setActiveConcept(null);
     setActiveSoccerPhase(0);
+    setIsNewAnalysisConfirmOpen(false);
+    setIsUrlInteracted(false);
     setNotice({
       kind: 'success',
       message: t('flavours.analysisControls.statusSourceCleared')
@@ -936,7 +1122,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
             )}
 
             {/* Case Actions (Export / Import / Generate Report / New Match) */}
-            <div className="space-y-2 pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
+            <div className={`border-b border-gray-100 dark:border-gray-800 ${isUrlSectionRevealed ? 'space-y-2 pb-4 mb-4' : 'space-y-2 mb-4'}`}>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -979,52 +1165,76 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                   <span className="truncate">{t('soccer.report.generatePdfButton')}</span>
                 </button>
 
-                {/* Source Data URL Input & Load Button */}
-                <div className="space-y-1.5 pt-1">
-                  <label
-                    htmlFor="soccer-sidebar-source-url"
-                    className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400"
-                  >
-                    {t('flavours.analysisControls.sourceUrl')}
-                  </label>
-                  <div className="relative flex items-center">
-                    <Link2 className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 absolute left-2.5 pointer-events-none" />
-                    <input
-                      id="soccer-sidebar-source-url"
-                      type="url"
-                      value={flavourCase.sourceUrl}
-                      onChange={e => handleUrlChange(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleLoadUrl();
-                      }}
-                      placeholder={t(textKeys.placeholderKey)}
-                      className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
-                    />
-                    {flavourCase.sourceUrl && (
-                      <button
-                        type="button"
-                        onClick={() => handleUrlChange('')}
-                        title={t('flavours.analysisControls.clearUrl')}
-                        className="absolute right-2 p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+                <button
+                  type="button"
+                  onClick={() => setIsNewAnalysisConfirmOpen(true)}
+                  title={t('header.newAnalysis')}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-300 dark:hover:border-rose-800 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors shadow-2xs cursor-pointer select-none"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                  <span className="truncate">{t('header.newAnalysis')}</span>
+                </button>
+
+                {/* Invisible trigger area between New Analysis button and the section separator (exactly matches the 8px gap + top spacing) */}
+                <div
+                  onClick={() => setIsUrlSectionRevealed(prev => !prev)}
+                  className="h-2 w-full cursor-default select-none"
+                  aria-hidden="true"
+                />
+
+                {/* Source Data URL Input & Load Button (Hidden by default; revealed by clicking the invisible gap above) */}
+                {isUrlSectionRevealed && (
+                  <div className="space-y-1.5 pt-1 animate-in fade-in duration-200">
+                    <label
+                      htmlFor="soccer-sidebar-source-url"
+                      className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400"
+                    >
+                      {t('flavours.analysisControls.sourceUrl')}
+                    </label>
+                    <div className="relative flex items-center">
+                      <Link2 className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 absolute left-2.5 pointer-events-none" />
+                      <input
+                        id="soccer-sidebar-source-url"
+                        type="url"
+                        value={flavourCase.sourceUrl}
+                        onFocus={() => setIsUrlInteracted(true)}
+                        onChange={e => handleUrlChange(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleLoadUrl();
+                        }}
+                        placeholder={t(textKeys.placeholderKey)}
+                        className={`w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors ${
+                          !isUrlInteracted && Boolean(flavourCase.sourceUrl)
+                            ? 'text-gray-400 dark:text-gray-500 italic'
+                            : 'text-gray-800 dark:text-gray-100 font-normal not-italic'
+                        }`}
+                      />
+                      {flavourCase.sourceUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleUrlChange('')}
+                          title={t('flavours.analysisControls.clearUrl')}
+                          className="absolute right-2 p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleLoadUrl}
+                      disabled={isScraping}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg shadow-2xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isScraping ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <ArrowDownToLine className="w-3.5 h-3.5" />
+                      )}
+                      <span>{isScraping ? t('flavours.analysisControls.loading') : t('flavours.analysisControls.load')}</span>
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleLoadUrl}
-                    disabled={isScraping}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg shadow-2xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {isScraping ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <ArrowDownToLine className="w-3.5 h-3.5" />
-                    )}
-                    <span>{isScraping ? t('flavours.analysisControls.loading') : t('flavours.analysisControls.load')}</span>
-                  </button>
-                </div>
+                )}
               </div>
             </div>
 
@@ -1096,14 +1306,56 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
               {isSoccerFlavour ? (
                 <>
                   {!parsedSoccerMatchData || !soccerTimeline ? (
-                    /* Bounded dashed box like in Phase 2 & 3 of main ordomachine when no data is loaded */
-                    <div className="w-full py-12 px-6 rounded-2xl bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 text-center space-y-2">
-                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        {t('soccer.emptyState.heading')}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {t('soccer.emptyState.description')}
-                      </p>
+                    /* Bounded dashed box when no match data is loaded, featuring generic import instructions and extensible web ingestor bookmarklets */
+                    <div className="w-full py-10 px-6 rounded-2xl bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 text-center space-y-6">
+                      <div className="max-w-md mx-auto space-y-1.5">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                          {t('soccer.emptyState.heading')}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                          {t('soccer.emptyState.description')}
+                        </p>
+                      </div>
+
+                      {/* Extensible Web Ingestors (Bookmarklets) Shelf */}
+                      <div className="max-w-xl mx-auto pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                            {t('soccer.emptyState.ingestorsTitle')}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                            {t('soccer.emptyState.ingestorsHelp')}
+                          </p>
+                        </div>
+
+                        {/* Ingestors Buttons List - Extensible for future platform bookmarklets */}
+                        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                          {/* WhoScored Ingestor Bookmarklet */}
+                          <a
+                            href={whoScoredBookmarkletHref}
+                            title={t('soccer.emptyState.bookmarkletHint')}
+                            onClick={e => {
+                              // If user clicks directly instead of dragging, show friendly instruction
+                              if (e.button === 0 && !e.ctrlKey && !e.metaKey) {
+                                alert(
+                                  language === 'es'
+                                    ? 'ℹ️ Para usar este botón, arrástralo con el ratón a tu barra de marcadores del navegador.\n\nLuego abre cualquier partido en WhoScored y pulsa el marcador para cargarlo automáticamente en Ordomática.'
+                                    : 'ℹ️ To use this button, drag it to your browser bookmarks bar.\n\nThen open any match on WhoScored and click the bookmark to automatically load it into Ordomática.'
+                                );
+                              }
+                            }}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl bg-gray-50 dark:bg-gray-800/90 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-2xs hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-700 dark:hover:text-blue-300 hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-grab active:cursor-grabbing select-none group"
+                          >
+                            {/* WhoScored Favicon / Brand Symbol */}
+                            <svg className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" viewBox="0 0 32 32" fill="none">
+                              <rect width="32" height="32" rx="7" fill="#1C2833" />
+                              <path d="M7 8.5h4.2l3.3 11.2 3.5-11.2h4l3.5 11.2L28.8 8.5H33l-5 15h-4.3l-3.5-11.2-3.5 11.2H12.4L7 8.5z" fill="#00A859" transform="scale(0.72) translate(4, 5)" />
+                              <circle cx="24" cy="8" r="3.5" fill="#E67E22" />
+                            </svg>
+                            <span className="font-bold">WhoScored.com</span>
+                          </a>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -1401,31 +1653,69 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
             {notice && (
               <div
                 role="status"
-                className={`mt-4 flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs font-medium ${
+                className={`mt-4 rounded-lg border text-xs font-medium transition-all ${
                   notice.kind === 'success'
                     ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300'
                     : notice.kind === 'warning'
-                    ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-200'
-                    : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-300'
+                    ? 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800/80 text-rose-900 dark:text-rose-200 shadow-sm'
+                    : 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800/80 text-red-900 dark:text-red-200 shadow-sm'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  {notice.kind === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                  ) : notice.kind === 'warning' ? (
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
-                  )}
-                  <span>{notice.message}</span>
+                <div className="flex items-start justify-between gap-2 p-3">
+                  <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    {notice.kind === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                    ) : notice.kind === 'warning' ? (
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+                    )}
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <p className="leading-relaxed">{notice.message}</p>
+                      {notice.details && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => setIsNoticeDetailsExpanded(prev => !prev)}
+                            title={
+                              isNoticeDetailsExpanded
+                                ? t('flavours.analysisControls.collapseNoticeDetails')
+                                : t('flavours.analysisControls.expandNoticeDetails')
+                            }
+                            aria-expanded={isNoticeDetailsExpanded}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-rose-100 hover:underline cursor-pointer select-none"
+                          >
+                            {isNoticeDetailsExpanded ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                            <Code2 className="w-3 h-3" />
+                            <span>{t('flavours.analysisControls.statusNoticeErrorDetails')}</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotice(null);
+                      setIsNoticeDetailsExpanded(false);
+                    }}
+                    className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors cursor-pointer shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setNotice(null)}
-                  className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+
+                {notice.details && isNoticeDetailsExpanded && (
+                  <div className="px-3 pb-3 pt-0 border-t border-rose-200/70 dark:border-rose-900/50 mt-1">
+                    <pre className="mt-2 p-2.5 rounded bg-white/90 dark:bg-gray-950/80 border border-rose-200 dark:border-rose-900/60 font-mono text-[11px] text-rose-900 dark:text-rose-200 whitespace-pre-wrap break-all max-h-48 overflow-y-auto leading-relaxed shadow-inner">
+                      {notice.details}
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
           </Card>
@@ -1675,6 +1965,50 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
           <AppFooter ref={rightFooterRef} />
         </div>
       </main>
+
+      {/* Confirmation Modal when New Analysis is clicked in Soccer Flavour */}
+      {isNewAnalysisConfirmOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <h3 className="font-bold text-gray-800 dark:text-gray-100 text-base">
+                  {t('header.newAnalysisConfirmTitle')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewAnalysisConfirmOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+              {t('header.newAnalysisConfirmDesc')}
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsNewAnalysisConfirmOpen(false)}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+              >
+                {t('header.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetSoccerMatch}
+                className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                {t('header.newAnalysisConfirmBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

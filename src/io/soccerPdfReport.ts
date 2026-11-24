@@ -987,8 +987,8 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
         <h3>${isEs ? '4. Uso de Datos de Origen y Finalidad Académica' : '4. Source Data Notice & Academic Purpose'}</h3>
         <p>
           ${isEs
-            ? `Se hace constar expresamente que los datos de eventos y métricas de este encuentro han sido extraídos de la fuente de referencia en la URL <code>${escapeHtml(sourceUrl)}</code> con fines <strong>exclusivamente académicos, científicos y docentes</strong>, bajo la doctrina de uso legítimo de información para investigación científica independiente, sin que exista relación o afiliación con los proveedores originales de dichos datos.`
-            : `It is expressly stated that the event data and match metrics were extracted from the reference URL <code>${escapeHtml(sourceUrl)}</code> for <strong>strictly academic, scientific, and educational purposes</strong> under fair use principles for independent scientific research.`}
+            ? `Se hace constar expresamente que los datos de eventos y métricas de este encuentro han sido agregados a partir de diversas fuentes públicas de datos de rendimiento futbolístico y de la URL de referencia <code>${escapeHtml(sourceUrl)}</code> con fines <strong>exclusivamente académicos, científicos y docentes</strong>, bajo la doctrina de uso legítimo de información para investigación científica independiente, sin que exista relación o afiliación comercial con los proveedores originales de dichos datos.`
+            : `It is expressly stated that the event data and match metrics were aggregated from multiple public football performance data sources and the reference URL <code>${escapeHtml(sourceUrl)}</code> for <strong>strictly academic, scientific, and educational purposes</strong> under fair use principles for independent scientific research, without any commercial relationship or affiliation with the original data providers.`}
         </p>
       </div>
     </div>
