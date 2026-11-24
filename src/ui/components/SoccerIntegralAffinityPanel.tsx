@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
-import { Network, Table, ChevronDown, ChevronUp, Database, Shield, X } from 'lucide-react';
+import {
+  Network,
+  Table,
+  ChevronLeft,
+  ChevronRight,
+  Shield,
+  X
+} from 'lucide-react';
 import { MatchPlayer, SoccerTimelineResult } from '../../logic/soccerAnalysis';
 import { useI18n } from '../i18n/I18nContext';
 import { SoccerPitchGraph } from './SoccerPitchGraph';
+import { AffinityStage } from './SoccerContextualAffinityPanel';
 
 export interface SoccerIntegralAffinityPanelProps {
   timeline: SoccerTimelineResult;
   players: MatchPlayer[];
   AC_cum: number[][];
+  AAI_cum?: number[][];
+  A_cum?: number[][];
   pass_cum: number[][];
   currentMinute: number;
   selectedTeam: 'home' | 'away';
@@ -20,6 +30,8 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
   timeline,
   players,
   AC_cum,
+  AAI_cum,
+  A_cum,
   pass_cum,
   currentMinute,
   selectedTeam,
@@ -27,9 +39,9 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
   className = '',
   onClose
 }) => {
-  const { t } = useI18n();
+  const { language } = useI18n();
+  const isEs = language === 'es';
   const [viewMode, setViewMode] = useState<'matrix' | 'graph'>('graph');
-  const [showPassDebug, setShowPassDebug] = useState<boolean>(false);
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
   const handleImgError = (key: string) => {
@@ -39,22 +51,93 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
   const isHome = selectedTeam === 'home';
   const teamName = isHome ? timeline.homeTeamName : timeline.awayTeamName;
   const crestUrl = isHome ? timeline.homeCrestUrl : timeline.awayCrestUrl;
-  const hasCrest = crestUrl && !imgErrors[selectedTeam];
+
+  // 4 horizontal stages ordered linearly:
+  // 0: Distancia (Pases acumulados)
+  // 1: Afinidad (Propagación acumulada)
+  // 2: Afinidad Autoinducida (Bloqueo acumulado)
+  // 3: Afinidad Contextual (Sinergia acumulada) -> Vista inicial predeterminada (stageIndex = 3)
+  const [stageIndex, setStageIndex] = useState<number>(3);
+
+  const stages: {
+    key: AffinityStage;
+    label: string;
+    subtitle: string;
+    matrix: number[][];
+    isInteger?: boolean;
+    precision: number;
+  }[] = [
+    {
+      key: 'distance',
+      label: isEs ? 'Distancia Acumulada' : 'Cumulative Distance',
+      subtitle: isEs
+        ? 'Pases acumulados entre jugadores'
+        : 'Cumulative passes between players',
+      matrix: pass_cum || Array.from({ length: players.length }, () => Array(players.length).fill(0)),
+      isInteger: true,
+      precision: 0
+    },
+    {
+      key: 'propagation',
+      label: isEs ? 'Afinidad Acumulada' : 'Cumulative Affinity',
+      subtitle: isEs
+        ? 'Afinidad base ponderada por minutos'
+        : 'Base affinity weighted by minutes',
+      matrix: A_cum || AC_cum,
+      precision: 2
+    },
+    {
+      key: 'blocking',
+      label: isEs ? 'Afinidad Autoinducida Acumulada' : 'Cumulative Autoinduced Affinity',
+      subtitle: isEs
+        ? 'Bloqueo ponderado y conservación unitaria'
+        : 'Weighted blocking & unit conservation',
+      matrix: AAI_cum || AC_cum,
+      precision: 2
+    },
+    {
+      key: 'contextual',
+      label: isEs ? 'Afinidad Contextual Acumulada' : 'Cumulative Contextual Affinity',
+      subtitle: isEs
+        ? 'Sinergia y modulación contextual ponderada'
+        : 'Weighted synergy & contextual modulation',
+      matrix: AC_cum,
+      precision: 2
+    }
+  ];
+
+  const currentStage = stages[stageIndex];
+  const activeMatrix = currentStage.matrix;
+
+  // Strict linear navigation: cannot loop directly between distance and contextual
+  const canGoPrev = stageIndex > 0;
+  const canGoNext = stageIndex < stages.length - 1;
+
+  const handlePrevStage = () => {
+    if (canGoPrev) setStageIndex(prev => prev - 1);
+  };
+
+  const handleNextStage = () => {
+    if (canGoNext) setStageIndex(prev => prev + 1);
+  };
 
   return (
     <div
       className={`rounded-2xl p-4 bg-gray-50/80 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-800 space-y-4 shadow-2xs ${className}`}
     >
-      {/* 1. Header with Team Switcher and Mode Toggle (Grafo / Matriz) */}
+      {/* 1. Header Integrado: Equipo, Intervalo de tiempo (0' - X') y Etapa activa */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200 dark:border-gray-800">
         <div className="flex flex-wrap items-center gap-2">
           <Network className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-          <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-            {t('soccer.integral.cumulativeAffinityTitle')} (A<sup>C</sup>
-            <sub className="text-[10px]">acum</sub>)
+          <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5 flex-wrap">
+            <span>{isEs ? 'Flujos de Valor Acumulados' : 'Cumulative Value Flows'}:</span>
+            <span className="text-blue-600 dark:text-blue-400">{currentStage.label}</span>
           </h3>
           <span className="text-xs px-2.5 py-0.5 rounded-full font-mono font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-            0&apos; - {currentMinute}&apos;
+            {teamName} · 0&apos; - {currentMinute}&apos;
+          </span>
+          <span className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+            ({stageIndex + 1}/{stages.length})
           </span>
         </div>
 
@@ -114,8 +197,8 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
             <button
               type="button"
               onClick={() => setViewMode('matrix')}
-              title={t('soccer.dimension.modeMatrix')}
-              aria-label={t('soccer.dimension.modeMatrix')}
+              title={isEs ? 'Modo Tabla' : 'Table Mode'}
+              aria-label={isEs ? 'Modo Tabla' : 'Table Mode'}
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'matrix'
                   ? 'bg-indigo-600 text-white shadow-2xs'
@@ -123,14 +206,14 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
               }`}
             >
               <Table className="w-3.5 h-3.5" />
-              <span>{t('soccer.dimension.modeMatrix')}</span>
+              <span>{isEs ? 'Tabla' : 'Table'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => setViewMode('graph')}
-              title={t('soccer.dimension.modeGraph')}
-              aria-label={t('soccer.dimension.modeGraph')}
+              title={isEs ? 'Modo Grafo' : 'Graph Mode'}
+              aria-label={isEs ? 'Modo Grafo' : 'Graph Mode'}
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'graph'
                   ? 'bg-indigo-600 text-white shadow-2xs'
@@ -138,7 +221,7 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
               }`}
             >
               <Network className="w-3.5 h-3.5" />
-              <span>{t('soccer.dimension.modeGraph')}</span>
+              <span>{isEs ? 'Grafo' : 'Graph'}</span>
             </button>
           </div>
 
@@ -147,164 +230,159 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
             <button
               type="button"
               onClick={onClose}
-              title={t('soccer.integral.closeAffinity')}
-              aria-label={t('soccer.integral.closeAffinity')}
+              title={isEs ? 'Cerrar panel' : 'Close panel'}
+              aria-label={isEs ? 'Cerrar panel' : 'Close panel'}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border border-gray-200 dark:border-gray-700 transition-all cursor-pointer shadow-2xs"
             >
               <X className="w-4 h-4 text-gray-500 hover:text-red-600 dark:hover:text-red-400 shrink-0" />
-              <span>{t('common.close')}</span>
+              <span>{isEs ? 'Cerrar' : 'Close'}</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. Main Cumulative Content: Horizontal Pitch Graph OR Cumulative Matrix Table */}
-      {viewMode === 'graph' ? (
-        <div className="py-2">
-          {players.length > 0 ? (
-            <SoccerPitchGraph
-              players={players}
-              matrix={AC_cum}
-              teamKey={selectedTeam}
-              teamName={teamName}
-              crestUrl={crestUrl}
-              decimalPrecision={2}
-            />
+      {/* 2. Main Content Area with Lateral Nav Controls on Left & Right */}
+      <div className="relative flex items-center justify-between gap-2">
+        {/* Left Discrete Nav Button */}
+        <button
+          type="button"
+          onClick={handlePrevStage}
+          disabled={!canGoPrev}
+          title={
+            canGoPrev
+              ? `${isEs ? 'Anterior:' : 'Previous:'} ${stages[stageIndex - 1].label}`
+              : isEs ? 'Extremo inicial (Distancia)' : 'Initial boundary (Distance)'
+          }
+          aria-label={isEs ? 'Etapa anterior' : 'Previous stage'}
+          className={`z-20 p-2 sm:p-2.5 rounded-full border shadow-sm transition-all shrink-0 ${
+            canGoPrev
+              ? 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-700 cursor-pointer active:scale-95'
+              : 'bg-gray-100/70 dark:bg-gray-800/40 text-gray-300 dark:text-gray-600 border-transparent cursor-not-allowed opacity-40'
+          }`}
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        {/* Center: Pitch Graph OR Matrix Table */}
+        <div className="flex-1 min-w-0">
+          {viewMode === 'graph' ? (
+            <div className="py-1">
+              {players.length > 0 ? (
+                <SoccerPitchGraph
+                  players={players}
+                  matrix={activeMatrix}
+                  teamKey={selectedTeam}
+                  teamName={teamName}
+                  crestUrl={crestUrl}
+                  decimalPrecision={currentStage.precision}
+                />
+              ) : (
+                <div className="text-center py-8 text-xs text-gray-500">
+                  {isEs
+                    ? 'No hay jugadores activos para este equipo en el minuto seleccionado.'
+                    : 'No active players for this team at the selected minute.'}
+                </div>
+              )}
+            </div>
           ) : (
-            <div className="text-center py-8 text-xs text-gray-500">
-              No hay jugadores activos para este equipo en el minuto seleccionado.
+            /* Matrix View Mode (Tabla con columna Σ Sumatorio) */
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/90 shadow-2xs p-2">
+              <div className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 px-2 py-1 mb-1">
+                {currentStage.label} — {currentStage.subtitle}:
+              </div>
+              <table className="w-full text-center border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="p-2 text-left text-[11px] text-gray-500 dark:text-gray-400 font-bold w-28">
+                      #
+                    </th>
+                    {players.map((colP, j) => (
+                      <th
+                        key={j}
+                        className="p-1.5 text-[11px] font-mono font-bold text-gray-600 dark:text-gray-300 min-w-[34px]"
+                        title={`#${colP.shirtNo} ${colP.name}`}
+                      >
+                        #{colP.shirtNo}
+                      </th>
+                    ))}
+                    <th
+                      className="p-1.5 text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400 min-w-[42px] bg-indigo-50/50 dark:bg-indigo-950/30"
+                      title={isEs ? 'Sumatorio de la fila' : 'Row sum'}
+                    >
+                      Σ
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {players.map((rowP, i) => {
+                    const rowSum = (activeMatrix[i] || []).reduce(
+                      (acc, v) => acc + (typeof v === 'number' && Number.isFinite(v) ? v : 0),
+                      0
+                    );
+                    return (
+                      <tr
+                        key={i}
+                        className="border-t border-gray-100 dark:border-gray-800/80 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
+                      >
+                        <td
+                          className="p-1.5 text-left font-medium text-gray-800 dark:text-gray-200 truncate max-w-[120px]"
+                          title={`#${rowP.shirtNo} ${rowP.name}`}
+                        >
+                          <span className="font-mono text-gray-500 dark:text-gray-400 mr-1.5 font-bold">
+                            #{rowP.shirtNo}
+                          </span>
+                          {rowP.name}
+                        </td>
+                        {players.map((colP, j) => {
+                          const rawVal = activeMatrix[i]?.[j] ?? 0;
+                          const isDiag = i === j;
+                          const displayVal = currentStage.isInteger
+                            ? (isDiag ? '-' : String(rawVal))
+                            : rawVal.toFixed(currentStage.precision);
+
+                          return (
+                            <td
+                              key={j}
+                              title={`${rowP.name} → ${colP.name}: ${displayVal}`}
+                              className={`p-1.5 font-mono text-[11px] text-gray-800 dark:text-gray-200 ${
+                                isDiag ? 'font-bold text-blue-600 dark:text-blue-400' : ''
+                              }`}
+                            >
+                              {displayVal}
+                            </td>
+                          );
+                        })}
+                        <td className="p-1.5 font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/30 dark:bg-indigo-950/20">
+                          {currentStage.isInteger ? String(Math.round(rowSum)) : rowSum.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      ) : (
-        /* Matrix View Mode (Clean, uncolored table) */
-        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/90 shadow-2xs p-2">
-          <table className="w-full text-center border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="p-2 text-left text-[11px] text-gray-500 dark:text-gray-400 font-bold w-28">
-                  #
-                </th>
-                {players.map((colP, j) => (
-                  <th
-                    key={j}
-                    className="p-1.5 text-[11px] font-mono font-bold text-gray-600 dark:text-gray-300 min-w-[34px]"
-                    title={`#${colP.shirtNo} ${colP.name}`}
-                  >
-                    #{colP.shirtNo}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {players.map((rowP, i) => (
-                <tr
-                  key={i}
-                  className="border-t border-gray-100 dark:border-gray-800/80 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
-                >
-                  <td
-                    className="p-1.5 text-left font-medium text-gray-800 dark:text-gray-200 truncate max-w-[120px]"
-                    title={`#${rowP.shirtNo} ${rowP.name}`}
-                  >
-                    <span className="font-mono text-gray-500 dark:text-gray-400 mr-1.5 font-bold">
-                      #{rowP.shirtNo}
-                    </span>
-                    {rowP.name}
-                  </td>
-                  {players.map((colP, j) => {
-                    const val = AC_cum[i]?.[j] ?? 0;
-                    const isDiag = i === j;
 
-                    return (
-                      <td
-                        key={j}
-                        title={`${rowP.name} → ${colP.name}: ${isDiag ? '1.00' : val.toFixed(2)}`}
-                        className="p-1.5 font-mono text-[11px] text-gray-800 dark:text-gray-200"
-                      >
-                        {isDiag ? '1.00' : val > 0 ? val.toFixed(2) : '0'}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* 3. Collapsible Debug Section: Cumulative Raw Pass Count / Distance Matrix */}
-      <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+        {/* Right Discrete Nav Button */}
         <button
           type="button"
-          onClick={() => setShowPassDebug(prev => !prev)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-2xs transition-all cursor-pointer select-none"
+          onClick={handleNextStage}
+          disabled={!canGoNext}
+          title={
+            canGoNext
+              ? `${isEs ? 'Siguiente:' : 'Next:'} ${stages[stageIndex + 1].label}`
+              : isEs ? 'Extremo final (Afinidad Contextual)' : 'Final boundary (Contextual Affinity)'
+          }
+          aria-label={isEs ? 'Etapa siguiente' : 'Next stage'}
+          className={`z-20 p-2 sm:p-2.5 rounded-full border shadow-sm transition-all shrink-0 ${
+            canGoNext
+              ? 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-700 cursor-pointer active:scale-95'
+              : 'bg-gray-100/70 dark:bg-gray-800/40 text-gray-300 dark:text-gray-600 border-transparent cursor-not-allowed opacity-40'
+          }`}
         >
-          <Database className="w-3.5 h-3.5 text-gray-500" />
-          <span>
-            {showPassDebug
-              ? t('soccer.integral.hideCumulativePassDebug')
-              : t('soccer.integral.cumulativePassDebug')}
-          </span>
-          {showPassDebug ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          <ChevronRight className="w-5 h-5" />
         </button>
-
-        {showPassDebug && (
-          <div className="mt-3 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/90 shadow-2xs p-2">
-            <div className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 px-2 py-1 mb-1">
-              Conteo acumulado de pases puros completados hasta el minuto {currentMinute}&apos; para {teamName} (acumulación incremental dependiente del slider / animación):
-            </div>
-            <table className="w-full text-center border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="p-2 text-left text-[11px] text-gray-500 dark:text-gray-400 font-bold w-28">
-                    #
-                  </th>
-                  {players.map((colP, j) => (
-                    <th
-                      key={j}
-                      className="p-1.5 text-[11px] font-mono font-bold text-gray-600 dark:text-gray-300 min-w-[34px]"
-                      title={`#${colP.shirtNo} ${colP.name}`}
-                    >
-                      #{colP.shirtNo}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {players.map((rowP, i) => (
-                  <tr
-                    key={i}
-                    className="border-t border-gray-100 dark:border-gray-800/80 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
-                  >
-                    <td
-                      className="p-1.5 text-left font-medium text-gray-800 dark:text-gray-200 truncate max-w-[120px]"
-                      title={`#${rowP.shirtNo} ${rowP.name}`}
-                    >
-                      <span className="font-mono text-gray-500 dark:text-gray-400 mr-1.5 font-bold">
-                        #{rowP.shirtNo}
-                      </span>
-                      {rowP.name}
-                    </td>
-                    {players.map((colP, j) => {
-                      const count = pass_cum[i]?.[j] ?? 0;
-                      const isDiag = i === j;
-
-                      return (
-                        <td
-                          key={j}
-                          title={`${rowP.name} → ${colP.name}: ${isDiag ? '-' : count}`}
-                          className="p-1.5 font-mono text-[11px] text-gray-800 dark:text-gray-200"
-                        >
-                          {isDiag ? '-' : count}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );

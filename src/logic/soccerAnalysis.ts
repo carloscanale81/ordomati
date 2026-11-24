@@ -2097,13 +2097,23 @@ export const computeIntegralMatchCumulativeScores = (
 
 export interface CumulativeAffinityResult {
   players: MatchPlayer[];
-  AC_cum: number[][];
-  pass_cum: number[][];
+  AC_cum: number[][]; // Contextual affinity cumulative matrix (synergy)
+  AAI_cum: number[][]; // Autoinduced affinity cumulative matrix (blocking)
+  A_cum: number[][]; // Base affinity cumulative matrix (propagation)
+  pass_cum: number[][]; // Distance (raw passes) cumulative matrix
 }
 
 /**
- * Computes the cumulative Contextual Affinity Matrix (A^C_acum) and raw pass distance matrix
- * for a team up to currentMinute, weighting each segment by effectiveDuration / totalMinutes.
+ * Computes the cumulative Contextual Affinity Matrix (A^C_acum), autoinduced (A^AI_acum),
+ * base affinity (A_acum) and raw pass distance matrix for a team up to currentMinute.
+ * 
+ * In accordance with Ordomatics formulation:
+ * - Accumulation occurs continuously on the underlying initial interaction data (passCounts)
+ *   up to currentMinute.
+ * - The canonical pipeline functions (Propagation F_P, Blocking F_B, Synergy F_S) are then
+ *   applied directly to this accumulated pass matrix, exactly as in segmented analysis.
+ * - This analytically guarantees unit row sums (sum_j a_ij = 1.0) for both Autoinduced (A^AI)
+ *   and Contextual Affinity (A^C) under schemes without synergy (k = 1.0 / type = 'none').
  */
 export const computeIntegralCumulativeAffinity = (
   timeline: SoccerTimelineResult,
@@ -2119,10 +2129,10 @@ export const computeIntegralCumulativeAffinity = (
   const segments = team === 'home' ? timeline.homeSegments : timeline.awaySegments;
 
   if (!segments || segments.length === 0) {
-    return { players: [], AC_cum: [], pass_cum: [] };
+    return { players: [], AC_cum: [], AAI_cum: [], A_cum: [], pass_cum: [] };
   }
 
-  // Find active segment at clampedMinute to get the active 11 players
+  // Find active segment at clampedMinute to determine active roster
   const activeSegment =
     segments.find(s => s.startMinute <= clampedMinute && clampedMinute <= s.endMinute) ||
     segments[segments.length - 1] ||
@@ -2131,56 +2141,76 @@ export const computeIntegralCumulativeAffinity = (
   const activePlayers = activeSegment?.activePlayers || [];
   const n = activePlayers.length;
   if (n === 0) {
-    return { players: [], AC_cum: [], pass_cum: [] };
+    return { players: [], AC_cum: [], AAI_cum: [], A_cum: [], pass_cum: [] };
   }
 
-  const AC_cum: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  // 1. Accumulate raw pass counts directly between active players up to clampedMinute
   const pass_cum: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  const events: any[] = matchData?.events || [];
+  let totalPasses = 0;
 
-  segments.forEach(seg => {
-    if (seg.startMinute >= clampedMinute) return;
-    const effectiveEnd = Math.min(seg.endMinute, clampedMinute);
-    const effectiveDuration = effectiveEnd - seg.startMinute;
-    if (effectiveDuration <= 0) return;
-
-    const segDuration = Math.max(1, seg.endMinute - seg.startMinute);
-    const weight = effectiveDuration / totalMinutes;
-    const passFraction = effectiveDuration / segDuration;
-
-    const analysis = computeSoccerDimensionalAnalysis(
-      matchData,
-      seg,
-      true,
-      synergyConfig,
-      'dribblesWon',
-      propagationConfig,
-      blockingConfig
-    );
-
-    const segAC = analysis.AC || [];
-    const segPasses = analysis.passCounts || [];
-    const segPlayers = analysis.players || [];
-
-    activePlayers.forEach((pi, i) => {
-      const idxI = segPlayers.findIndex(p => p.id === pi.id || p.name === pi.name);
-      if (idxI === -1) return;
-
-      activePlayers.forEach((pj, j) => {
-        const idxJ = segPlayers.findIndex(p => p.id === pj.id || p.name === pj.name);
-        if (idxJ === -1) return;
-
-        const cellAC = segAC[idxI]?.[idxJ] ?? 0;
-        const cellPass = segPasses[idxI]?.[idxJ] ?? 0;
-
-        AC_cum[i][j] += cellAC * weight;
-        pass_cum[i][j] += Math.round(cellPass * passFraction);
-      });
-    });
+  events.forEach((ev, evIdx) => {
+    if (ev.minute <= clampedMinute) {
+      const isPass =
+        (ev.type === 'Pass' || ev.type?.displayName === 'Pass' || ev.type?.value === 1) &&
+        (ev.outcome === 'Successful' || ev.outcomeType?.displayName === 'Successful');
+      if (isPass) {
+        const fromIdx = findSegmentPlayerIndex(ev, activePlayers, matchData);
+        if (fromIdx !== -1) {
+          const toIdx = findSegmentReceiverIndex(
+            ev,
+            evIdx,
+            events,
+            activePlayers,
+            matchData,
+            team
+          );
+          if (toIdx !== -1 && fromIdx !== toIdx) {
+            pass_cum[fromIdx][toIdx] += 1;
+            totalPasses += 1;
+          }
+        }
+      }
+    }
   });
+
+  // Fallback: if no raw event passes registered in period, accumulate tactical passes proportionally (unless clampedMinute === 0)
+  if (totalPasses === 0 && clampedMinute > 0) {
+    deriveTacticalPasses(pass_cum, activePlayers, clampedMinute);
+  }
+
+  // 2. Find max passes between any distinct pair in this accumulated period
+  let maxPasses = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i !== j && pass_cum[i][j] > maxPasses) {
+        maxPasses = pass_cum[i][j];
+      }
+    }
+  }
+
+  // 3. Affinity Matrix A_cum via unified Propagation Function F_P
+  const L = (typeof propagationConfig.limit === 'number' && propagationConfig.limit > 0)
+    ? propagationConfig.limit
+    : (maxPasses || 1);
+  const cutVal = propagationConfig.limit ?? Math.max(1, Math.round(maxPasses / 2));
+  const A_cum = computeAffinityMatrix(
+    pass_cum,
+    { ...propagationConfig, limit: L },
+    { extraScope: { cut: cutVal }, precision: 4 }
+  );
+
+  // 4. Autoinduced Affinity Matrix AAI_cum via unified Blocking Function F_B
+  const AAI_cum = computeAutoinducedAffinity(A_cum, undefined, blockingConfig);
+
+  // 5. Contextual Affinity Matrix AC_cum via unified Synergy Function F_S
+  const AC_cum = computeContextualAffinity(AAI_cum, synergyConfig);
 
   return {
     players: activePlayers,
     AC_cum,
+    AAI_cum,
+    A_cum,
     pass_cum
   };
 };

@@ -63,6 +63,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
     'aggregate'
   );
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1); // 0.5x, 1x, 2x, 4x
   const [selectedAffinityTeam, setSelectedAffinityTeam] = useState<'home' | 'away'>('home');
   const [isAffinityExpanded, setIsAffinityExpanded] = useState<boolean>(false);
   const expandedAffinityRef = useRef<HTMLDivElement>(null);
@@ -195,20 +196,33 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
     return m > 0 ? m : 1;
   }, [homePlayers, awayPlayers]);
 
-  // Playback timer
+  // Playback timer with adjustable speed
   React.useEffect(() => {
     if (!isPlaying) return;
+    const intervalMs = Math.max(25, Math.round(150 / playbackSpeed));
     const interval = setInterval(() => {
       setSliderMinute(prev => {
         if (prev >= totalMinutes) {
           setIsPlaying(false);
           return totalMinutes;
         }
-        return Math.min(totalMinutes, prev + 2);
+        return Math.min(totalMinutes, prev + 1);
       });
-    }, 150);
+    }, intervalMs);
     return () => clearInterval(interval);
-  }, [isPlaying, totalMinutes]);
+  }, [isPlaying, totalMinutes, playbackSpeed]);
+
+  // Handle play/pause with automatic restart from beginning if currently at end
+  const handleTogglePlay = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+    } else {
+      if (sliderMinute >= totalMinutes) {
+        setSliderMinute(0);
+      }
+      setIsPlaying(true);
+    }
+  };
 
   // Jump to next or prev convergent cut point
   const handleStep = (direction: 'prev' | 'next') => {
@@ -340,6 +354,8 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
               timeline={timeline}
               players={cumulativeAffinity.players}
               AC_cum={cumulativeAffinity.AC_cum}
+              AAI_cum={cumulativeAffinity.AAI_cum}
+              A_cum={cumulativeAffinity.A_cum}
               pass_cum={cumulativeAffinity.pass_cum}
               currentMinute={sliderMinute}
               selectedTeam={selectedAffinityTeam}
@@ -356,8 +372,8 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
               {t('soccer.integral.timelineTitle')}
             </span>
 
-            {/* Playback Controls */}
-            <div className="flex items-center gap-1.5">
+            {/* Playback Controls & Speed Selector */}
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 type="button"
                 onClick={() => setSliderMinute(0)}
@@ -376,9 +392,9 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
               </button>
               <button
                 type="button"
-                onClick={() => setIsPlaying(prev => !prev)}
+                onClick={handleTogglePlay}
                 title={isPlaying ? t('soccer.integral.btnPause') : t('soccer.integral.btnPlay')}
-                className="px-2.5 py-1 rounded-md bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 rounded-md bg-indigo-600 text-white text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs hover:bg-indigo-700"
               >
                 {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                 <span>{isPlaying ? t('soccer.integral.pause') : t('soccer.integral.play')}</span>
@@ -391,6 +407,25 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
               >
                 <FastForward className="w-3.5 h-3.5" />
               </button>
+
+              {/* Speed Switcher Dropdown / Pills */}
+              <div className="flex items-center bg-white dark:bg-gray-800 p-0.5 rounded-lg border border-gray-200 dark:border-gray-700 shadow-2xs ml-1">
+                {[0.25, 0.5, 1, 2, 4].map(speed => (
+                  <button
+                    key={speed}
+                    type="button"
+                    onClick={() => setPlaybackSpeed(speed)}
+                    title={`Velocidad ${speed}x`}
+                    className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                      playbackSpeed === speed
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {speed}x
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

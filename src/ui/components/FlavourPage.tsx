@@ -1854,7 +1854,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                         <div className="flex items-center gap-2">
                           <Network className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
                           <span className="font-bold text-gray-900 dark:text-gray-100">
-                            {t('soccer.affinity.contextualTitle') || 'Afinidad Contextual'}
+                            {t('soccer.affinity.contextualTitle') || 'Flujos de Valor'}
                           </span>
                         </div>
                       }
@@ -1876,6 +1876,8 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                           segment={activeSegment}
                           players={activeSegment.activePlayers}
                           AC={soccerDimAnalyses[0].AC}
+                          AAI={soccerDimAnalyses[0].AAI}
+                          A={soccerDimAnalyses[0].A}
                           passCounts={soccerDimAnalyses[0].passCounts}
                           teamKey={activeSegment.team}
                           crestUrl={activeSegment.team === 'home' ? soccerTimeline?.homeCrestUrl : soccerTimeline?.awayCrestUrl}

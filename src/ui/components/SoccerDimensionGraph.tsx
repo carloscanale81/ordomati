@@ -98,7 +98,7 @@ export const SoccerDimensionGraph: React.FC<SoccerDimensionGraphProps> = ({
 
   return (
     <div
-      className={`w-full rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-xs relative bg-slate-900 select-none ${className}`}
+      className={`w-full max-w-[960px] mx-auto rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm relative bg-[#0b1329] select-none ${className}`}
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto drop-shadow-md">
         <defs>
@@ -115,22 +115,32 @@ export const SoccerDimensionGraph: React.FC<SoccerDimensionGraphProps> = ({
           </marker>
 
           {/* Node drop shadow */}
-          <filter id={`node-shadow-${uid}`} x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.6" />
+          <filter id={`node-shadow-${uid}`} x="-25%" y="-25%" width="150%" height="150%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3.5" floodColor="#000000" floodOpacity="0.55" />
           </filter>
         </defs>
 
-        {/* Subtle elliptical guideline */}
+        {/* Subtle grid pattern / pitch-like backdrop lines */}
         <ellipse
           cx={cx}
           cy={cy}
           rx={rx}
           ry={ry}
           fill="none"
-          stroke="#334155"
+          stroke="#1e293b"
+          strokeWidth="1.2"
+          strokeDasharray="6 6"
+          opacity="0.4"
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={70}
+          fill="none"
+          stroke="#1e293b"
           strokeWidth="1"
           strokeDasharray="4 4"
-          opacity="0.35"
+          opacity="0.25"
         />
 
         {/* Directed Curved Affinity Arrows */}

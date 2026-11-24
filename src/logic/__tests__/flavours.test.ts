@@ -565,6 +565,12 @@ test('computeIntegralCumulativeAffinity accumulates contextual affinity and pass
   // Check AC_cum values
   const hasPositiveAffinity = fullAffinity.AC_cum.some(row => row.some(v => v > 0));
   assert.ok(hasPositiveAffinity, 'Cumulative affinity matrix must have positive values');
+
+  // Verify unit row sums (conservation) under no synergy
+  fullAffinity.AC_cum.forEach((row, i) => {
+    const sum = row.reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(sum - 1.0) < 1e-3, `Row ${i} of cumulative AC without synergy must sum to 1.0, got ${sum}`);
+  });
 });
 
 test('extractMatchInfoFromUrl dynamically parses competition, stage, date, and venue from URL slugs', () => {

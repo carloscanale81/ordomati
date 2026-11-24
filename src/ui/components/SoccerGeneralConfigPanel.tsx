@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sliders, Grid, Table, Network } from 'lucide-react';
+import { Sliders, Grid, Table, Network, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   SoccerPropagationConfig,
   SoccerBlockingConfig,
@@ -60,6 +60,7 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
 }) => {
   const { t } = useI18n();
   const [dimAffinityViewMode, setDimAffinityViewMode] = useState<'table' | 'graph'>('table');
+  const [isDimAffinityCollapsed, setIsDimAffinityCollapsed] = useState<boolean>(false);
 
   const handleOwaPresetChange = (type: SoccerOwaType) => {
     onUpdateOwa({
@@ -179,7 +180,7 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
         </div>
       </div>
 
-      {/* 3. Matriz de Afinidad entre Dimensiones C (Ancho completo, Modo Tabla y Modo Gráfico) */}
+      {/* 3. Matriz de Afinidad entre Dimensiones C (Ancho completo, Modo Tabla y Modo Gráfico con Colapso/Expansión) */}
       <div className="p-4 rounded-xl bg-gray-50/80 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-800 space-y-3 w-full shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-200 dark:border-gray-800">
           <div className="flex flex-wrap items-baseline gap-2">
@@ -192,37 +193,53 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
             </span>
           </div>
 
-          {/* Table Mode / Graph Mode Toggle (Tabla / Grafo) */}
-          <div className="flex items-center gap-1 bg-white dark:bg-gray-800 p-0.5 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {/* Table Mode / Graph Mode Toggle (Tabla / Grafo) */}
+            {!isDimAffinityCollapsed && (
+              <div className="flex items-center gap-1 bg-white dark:bg-gray-800 p-0.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setDimAffinityViewMode('table')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                    dimAffinityViewMode === 'table'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  <Table className="w-3.5 h-3.5" />
+                  <span>{t('soccer.aggregate.dimAffinityModeTable')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDimAffinityViewMode('graph')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                    dimAffinityViewMode === 'graph'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  <Network className="w-3.5 h-3.5" />
+                  <span>{t('soccer.aggregate.dimAffinityModeGraph')}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Collapse / Expand Toggle Button */}
             <button
               type="button"
-              onClick={() => setDimAffinityViewMode('table')}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                dimAffinityViewMode === 'table'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-              }`}
+              onClick={() => setIsDimAffinityCollapsed(prev => !prev)}
+              title={isDimAffinityCollapsed ? t('soccer.dimension.expand') : t('soccer.dimension.collapse')}
+              aria-label={isDimAffinityCollapsed ? t('soccer.dimension.expand') : t('soccer.dimension.collapse')}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-all bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 shadow-2xs cursor-pointer select-none"
             >
-              <Table className="w-3.5 h-3.5" />
-              <span>{t('soccer.aggregate.dimAffinityModeTable')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDimAffinityViewMode('graph')}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                dimAffinityViewMode === 'graph'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-              }`}
-            >
-              <Network className="w-3.5 h-3.5" />
-              <span>{t('soccer.aggregate.dimAffinityModeGraph')}</span>
+              {isDimAffinityCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
         {/* View Mode Content */}
-        {dimAffinityViewMode === 'table' ? (
+        {!isDimAffinityCollapsed && (
+          dimAffinityViewMode === 'table' ? (
           <div className="overflow-x-auto max-h-[360px] overflow-y-auto">
             <table className="w-full text-center border-collapse text-xs font-mono">
               <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10 shadow-2xs">
@@ -283,7 +300,7 @@ export const SoccerGeneralConfigPanel: React.FC<SoccerGeneralConfigPanelProps> =
               decimalPrecision={2}
             />
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
