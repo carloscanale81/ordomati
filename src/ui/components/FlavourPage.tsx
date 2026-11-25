@@ -135,7 +135,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   const [activeSoccerPhase, setActiveSoccerPhase] = useState<number>(0);
   const [activeConcept, setActiveConcept] = useState<SoccerConcept | null>(null);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>('');
-  const [isConfigCollapsed, setIsConfigCollapsed] = useState<boolean>(false);
+  const [isConfigCollapsed, setIsConfigCollapsed] = useState<boolean>(true);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(false);
   const [isAffinityCollapsed, setIsAffinityCollapsed] = useState<boolean>(false);
 
