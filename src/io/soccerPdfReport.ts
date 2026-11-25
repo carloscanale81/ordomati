@@ -1075,7 +1075,7 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
     <div id="sec-config-matrix" style="margin-bottom: 20px;">
       <h3>1.3 ${isEs ? 'Matriz de Afinidad Interdimensional (C)' : 'Interdimensional Affinity Matrix (C)'}</h3>
       <p style="font-size: 9pt; color: #475569;">
-        ${isEs ? 'Afinidad conceptual entre las 12 dimensiones del juego analizadas:' : 'Conceptual affinity across the 12 tactical dimensions:'}
+        ${isEs ? 'Afinidad conceptual entre las 10 dimensiones del juego analizadas:' : 'Conceptual affinity across the 10 tactical dimensions:'}
       </p>
       <table class="matrix-table">
         <thead>
@@ -1585,7 +1585,7 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
           <!-- 12 Dimensions Breakdown -->
           <div>
             <div style="font-size: 8pt; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
-              ${isEs ? 'Puntuación Acumulada en las 12 Dimensiones' : 'Cumulative 12-Dimensional Scores'}
+              ${isEs ? 'Puntuación Acumulada en las 10 Dimensiones' : 'Cumulative 10-Dimensional Scores'}
             </div>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 7.5pt;">
               ${(fm.dimCumulativeScores || []).map((dim: any) => `

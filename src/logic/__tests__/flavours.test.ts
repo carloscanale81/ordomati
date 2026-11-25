@@ -349,7 +349,7 @@ test('computeSoccerDimensionalAnalysis generates A matrix, applies synergy to AC
   }
 });
 
-test('computeSoccerDimensionalAnalysis supports all 12 dimensions including Regates ganados and Tiros a puerta', () => {
+test('computeSoccerDimensionalAnalysis supports all 10 dimensions including Regates ganados and Tiros a puerta', () => {
   const matchData = createRecreationMatchData2007644();
   const timeline = parseSoccerTimeline(matchData);
   const firstSeg = timeline.homeSegments[0];
@@ -360,13 +360,11 @@ test('computeSoccerDimensionalAnalysis supports all 12 dimensions including Rega
     'aerial',
     'shotsOnTarget',
     'touches',
-    'passAccuracy',
     'accuratePasses',
     'keyPasses',
     'tacklesSuccessful',
     'clearances',
-    'interceptions',
-    'cornerAccuracy'
+    'interceptions'
   ] as const;
 
   const expectedNames: Record<string, string> = {
@@ -375,13 +373,11 @@ test('computeSoccerDimensionalAnalysis supports all 12 dimensions including Rega
     aerial: 'Aéreos ganados',
     shotsOnTarget: 'Tiros a puerta',
     touches: 'Toques',
-    passAccuracy: 'Acierto pases',
     accuratePasses: 'Pases precisos',
     keyPasses: 'Pases clave',
     tacklesSuccessful: 'Entradas exitosas',
     clearances: 'Despejes',
     interceptions: 'Intercepciones',
-    cornerAccuracy: 'Precisión córner',
     dribbles: 'Regates ganados',
     shots: 'Tiros a puerta'
   };
@@ -417,7 +413,7 @@ test('computeSoccerDimensionalAnalysis supports all 12 dimensions including Rega
   assert.equal(shotsAlias.conceptName, 'Tiros a puerta');
 });
 
-test('computeSoccerAggregatedAnalysis aggregates 12 dimensions using OWA and dimension affinity', () => {
+test('computeSoccerAggregatedAnalysis aggregates 10 dimensions using OWA and dimension affinity', () => {
   const matchData = createRecreationMatchData2007644();
   const timeline = parseSoccerTimeline(matchData);
   const firstSeg = timeline.homeSegments[0];
@@ -430,7 +426,7 @@ test('computeSoccerAggregatedAnalysis aggregates 12 dimensions using OWA and dim
 
   assert.equal(agg.players.length, 11);
   assert.equal(agg.V.length, 11);
-  assert.equal(agg.V[0].length, 12, 'V matrix must have 12 dimension columns');
+  assert.equal(agg.V[0].length, 10, 'V matrix must have 10 dimension columns');
   assert.equal(agg.scores.length, 11);
   assert.equal(agg.ranking.length, 11);
   assert.ok(agg.mvpPlayer, 'Segment MVP player must be identified');
@@ -604,9 +600,9 @@ test('SOCCER_OWA_PRESETS implements Promedio, Especialista, and Equilibrado with
   const spec = SOCCER_OWA_PRESETS.specialist;
   const bal = SOCCER_OWA_PRESETS.balanced;
 
-  assert.equal(avg.length, 12);
-  assert.equal(spec.length, 12);
-  assert.equal(bal.length, 12);
+  assert.equal(avg.length, 10);
+  assert.equal(spec.length, 10);
+  assert.equal(bal.length, 10);
 
   // Sums must all normalize to 1.0
   const avgSum = avg.reduce((a, b) => a + b, 0);
@@ -622,8 +618,8 @@ test('SOCCER_OWA_PRESETS implements Promedio, Especialista, and Equilibrado with
   assert.ok(Math.abs(spec[0] - 2 * spec[1]) < 0.01);
 
   // Balanced: each weight is double of previous
-  assert.ok(bal[11] > bal[10] && bal[10] > bal[9]);
-  assert.ok(Math.abs(bal[11] - 2 * bal[10]) < 0.01);
+  assert.ok(bal[9] > bal[8] && bal[8] > bal[7]);
+  assert.ok(Math.abs(bal[9] - 2 * bal[8]) < 0.01);
 });
 
 test('computeSoccerAggregatedAnalysis applies equalization adjustment relative to dimension maximum', () => {
@@ -642,10 +638,10 @@ test('computeSoccerAggregatedAnalysis applies equalization adjustment relative t
 
   assert.ok(agg.equalizedV, 'equalizedV matrix must be returned');
   assert.equal(agg.equalizedV.length, 11);
-  assert.equal(agg.equalizedV[0].length, 12);
+  assert.equal(agg.equalizedV[0].length, 10);
 
   // In each dimension column j, all values must be in [0, 1] and the max must be 1.0 (or 0 if all 0)
-  for (let j = 0; j < 12; j++) {
+  for (let j = 0; j < 10; j++) {
     const colVals = agg.equalizedV.map(row => row[j]);
     const maxVal = Math.max(...colVals);
     assert.ok(maxVal <= 1.0, `Max equalized value in dim ${j} must be <= 1.0`);

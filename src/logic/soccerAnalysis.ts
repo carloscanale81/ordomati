@@ -99,19 +99,18 @@ export interface SoccerOwaConfig {
 }
 
 export const SOCCER_OWA_PRESETS: Record<SoccerOwaType, number[]> = {
-  average: [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0837],
-  specialist: [0.5001, 0.2501, 0.1250, 0.0625, 0.0313, 0.0156, 0.0078, 0.0039, 0.0020, 0.0010, 0.0005, 0.0002],
-  balanced: [0.0002, 0.0005, 0.0010, 0.0020, 0.0039, 0.0078, 0.0156, 0.0313, 0.0625, 0.1250, 0.2501, 0.5001],
-  optimistic: [0.5001, 0.2501, 0.1250, 0.0625, 0.0313, 0.0156, 0.0078, 0.0039, 0.0020, 0.0010, 0.0005, 0.0002],
-  pessimistic: [0.0002, 0.0005, 0.0010, 0.0020, 0.0039, 0.0078, 0.0156, 0.0313, 0.0625, 0.1250, 0.2501, 0.5001],
-  custom: [0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0833, 0.0837]
+  average: [0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000],
+  specialist: [0.5000, 0.2500, 0.1250, 0.0625, 0.0313, 0.0156, 0.0078, 0.0039, 0.0020, 0.0019],
+  balanced: [0.0019, 0.0020, 0.0039, 0.0078, 0.0156, 0.0313, 0.0625, 0.1250, 0.2500, 0.5000],
+  optimistic: [0.5000, 0.2500, 0.1250, 0.0625, 0.0313, 0.0156, 0.0078, 0.0039, 0.0020, 0.0019],
+  pessimistic: [0.0019, 0.0020, 0.0039, 0.0078, 0.0156, 0.0313, 0.0625, 0.1250, 0.2500, 0.5000],
+  custom: [0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000, 0.1000]
 };
 
 /**
- * Interdimensional Affinity Matrix C [12 x 12] for Soccer MVP multi-criteria aggregation.
+ * Interdimensional Affinity Matrix C [10 x 10] for Soccer MVP multi-criteria aggregation.
  * Symmetrically structured to capture football tactical coherence and mitigate
- * isolated single-sample outliers (e.g. lucky unassisted goals, small-sample 100% pass accuracy,
- * or accidental clearances by forwards).
+ * isolated single-sample outliers.
  *
  * Dimensions:
  * 0: dribblesWon       (Dribbles / Regates)
@@ -119,56 +118,50 @@ export const SOCCER_OWA_PRESETS: Record<SoccerOwaType, number[]> = {
  * 2: aerial            (Aerials won / Duelos aéreos)
  * 3: shotsOnTarget     (Shots on target / Tiros a puerta)
  * 4: touches           (Touches / Toques)
- * 5: passAccuracy      (Pass accuracy % / Acierto pases)
- * 6: accuratePasses    (Accurate passes / Pases precisos)
- * 7: keyPasses         (Key passes / Pases clave)
- * 8: tacklesSuccessful (Tackles / Entradas exitosas)
- * 9: clearances        (Clearances / Despejes)
- * 10: interceptions    (Interceptions / Intercepciones)
- * 11: cornerAccuracy   (Corner accuracy % / Precisión córner)
+ * 5: accuratePasses    (Accurate passes / Pases precisos)
+ * 6: keyPasses         (Key passes / Pases clave)
+ * 7: tacklesSuccessful (Tackles / Entradas exitosas)
+ * 8: clearances        (Clearances / Despejes)
+ * 9: interceptions    (Interceptions / Intercepciones)
  *
  * Tactical Clusters:
- * - Finishing & Threat: goals (1) <-> shotsOnTarget (3) [0.90], dribblesWon (0) [0.65], keyPasses (7) [0.60]
- * - Core Possession: touches (4) <-> accuratePasses (6) [0.90], passAccuracy (5) [0.80]
- * - Creation & Set-Pieces: keyPasses (7) <-> cornerAccuracy (11) [0.75], accuratePasses (6) [0.70]
- * - Defensive Shielding: tackles (8) <-> interceptions (10) [0.85], clearances (9) [0.55], aerial (2) [0.50]
- * - Defensive Aerial/Box: aerial (2) <-> clearances (9) [0.80], interceptions (10) [0.60]
- * - Cross-phase Orthogonality: clearances (9) <-> goals (1) [0.10], shotsOnTarget (3) [0.10]
+ * - Finishing & Threat: goals (1) <-> shotsOnTarget (3) [0.90], dribblesWon (0) [0.65], keyPasses (6) [0.60]
+ * - Core Possession: touches (4) <-> accuratePasses (5) [0.90]
+ * - Creation: keyPasses (6) <-> accuratePasses (5) [0.70]
+ * - Defensive Shielding: tackles (7) <-> interceptions (9) [0.85], clearances (8) [0.55], aerial (2) [0.50]
+ * - Defensive Aerial/Box: aerial (2) <-> clearances (8) [0.80], interceptions (9) [0.60]
+ * - Cross-phase Orthogonality: clearances (8) <-> goals (1) [0.10], shotsOnTarget (3) [0.10]
  */
 export const DEFAULT_SOCCER_DIM_AFFINITY: number[][] = [
   // 0: dribblesWon
-  [1.00, 0.60, 0.20, 0.65, 0.65, 0.45, 0.50, 0.70, 0.40, 0.15, 0.35, 0.40],
+  [1.00, 0.60, 0.20, 0.65, 0.65, 0.50, 0.70, 0.40, 0.15, 0.35],
   // 1: goals
-  [0.60, 1.00, 0.45, 0.90, 0.45, 0.35, 0.40, 0.60, 0.20, 0.10, 0.20, 0.35],
+  [0.60, 1.00, 0.45, 0.90, 0.45, 0.40, 0.60, 0.20, 0.10, 0.20],
   // 2: aerial
-  [0.20, 0.45, 1.00, 0.40, 0.40, 0.30, 0.30, 0.30, 0.50, 0.80, 0.60, 0.25],
+  [0.20, 0.45, 1.00, 0.40, 0.40, 0.30, 0.30, 0.50, 0.80, 0.60],
   // 3: shotsOnTarget
-  [0.65, 0.90, 0.40, 1.00, 0.55, 0.40, 0.45, 0.65, 0.20, 0.10, 0.20, 0.40],
+  [0.65, 0.90, 0.40, 1.00, 0.55, 0.45, 0.65, 0.20, 0.10, 0.20],
   // 4: touches
-  [0.65, 0.45, 0.40, 0.55, 1.00, 0.65, 0.90, 0.65, 0.55, 0.30, 0.55, 0.45],
-  // 5: passAccuracy
-  [0.45, 0.35, 0.30, 0.40, 0.65, 1.00, 0.80, 0.55, 0.40, 0.20, 0.45, 0.55],
-  // 6: accuratePasses
-  [0.50, 0.40, 0.30, 0.45, 0.90, 0.80, 1.00, 0.70, 0.50, 0.25, 0.50, 0.50],
-  // 7: keyPasses
-  [0.70, 0.60, 0.30, 0.65, 0.65, 0.55, 0.70, 1.00, 0.35, 0.15, 0.35, 0.75],
-  // 8: tacklesSuccessful
-  [0.40, 0.20, 0.50, 0.20, 0.55, 0.40, 0.50, 0.35, 1.00, 0.55, 0.85, 0.25],
-  // 9: clearances
-  [0.15, 0.10, 0.80, 0.10, 0.30, 0.20, 0.25, 0.15, 0.55, 1.00, 0.70, 0.10],
-  // 10: interceptions
-  [0.35, 0.20, 0.60, 0.20, 0.55, 0.45, 0.50, 0.35, 0.85, 0.70, 1.00, 0.25],
-  // 11: cornerAccuracy
-  [0.40, 0.35, 0.25, 0.40, 0.45, 0.55, 0.50, 0.75, 0.25, 0.10, 0.25, 1.00]
+  [0.65, 0.45, 0.40, 0.55, 1.00, 0.90, 0.65, 0.55, 0.30, 0.55],
+  // 5: accuratePasses
+  [0.50, 0.40, 0.30, 0.45, 0.90, 1.00, 0.70, 0.50, 0.25, 0.50],
+  // 6: keyPasses
+  [0.70, 0.60, 0.30, 0.65, 0.65, 0.70, 1.00, 0.35, 0.15, 0.35],
+  // 7: tacklesSuccessful
+  [0.40, 0.20, 0.50, 0.20, 0.55, 0.50, 0.35, 1.00, 0.55, 0.85],
+  // 8: clearances
+  [0.15, 0.10, 0.80, 0.10, 0.30, 0.25, 0.15, 0.55, 1.00, 0.70],
+  // 9: interceptions
+  [0.35, 0.20, 0.60, 0.20, 0.55, 0.50, 0.35, 0.85, 0.70, 1.00]
 ];
 
 export interface SoccerAggregatedAnalysis {
   segment: TimelineSegment;
   players: MatchPlayer[];
-  V: number[][]; // [11 x 12] matrix of Own Values per player across the dimensions
-  equalizedV: number[][]; // [11 x 12] matrix normalized by dimension maximum
-  dimAffinityMatrix: number[][]; // [12 x 12]
-  normalizedAffinity: number[][]; // [12 x 12] C'
+  V: number[][]; // [11 x 10] matrix of Own Values per player across the dimensions
+  equalizedV: number[][]; // [11 x 10] matrix normalized by dimension maximum
+  dimAffinityMatrix: number[][]; // [10 x 10]
+  normalizedAffinity: number[][]; // [10 x 10] C'
   owaConfig: SoccerOwaConfig;
   equalizationConfig?: SoccerEqualizationConfig | SoccerEqualizationConfig[];
   scores: number[]; // Aggregated score A_final per player (11)
@@ -224,13 +217,11 @@ export const SOCCER_CONCEPTS: SoccerDimensionConceptConfig[] = [
   { key: 'aerial', name: 'Aéreos ganados', nameKey: 'soccer.concepts.aerial', unit: 'aéreos' },
   { key: 'shotsOnTarget', name: 'Tiros a puerta', nameKey: 'soccer.concepts.shotsOnTarget', unit: 'tiros' },
   { key: 'touches', name: 'Toques', nameKey: 'soccer.concepts.touches', unit: 'toques' },
-  { key: 'passAccuracy', name: 'Acierto pases', nameKey: 'soccer.concepts.passAccuracy', unit: '%' },
   { key: 'accuratePasses', name: 'Pases precisos', nameKey: 'soccer.concepts.accuratePasses', unit: 'pases' },
   { key: 'keyPasses', name: 'Pases clave', nameKey: 'soccer.concepts.keyPasses', unit: 'pases' },
   { key: 'tacklesSuccessful', name: 'Entradas exitosas', nameKey: 'soccer.concepts.tacklesSuccessful', unit: 'entradas' },
   { key: 'clearances', name: 'Despejes', nameKey: 'soccer.concepts.clearances', unit: 'despejes' },
-  { key: 'interceptions', name: 'Intercepciones', nameKey: 'soccer.concepts.interceptions', unit: 'intercepciones' },
-  { key: 'cornerAccuracy', name: 'Precisión córner', nameKey: 'soccer.concepts.cornerAccuracy', unit: '%' }
+  { key: 'interceptions', name: 'Intercepciones', nameKey: 'soccer.concepts.interceptions', unit: 'intercepciones' }
 ];
 
 export interface SoccerDimensionalAnalysis {
@@ -1849,8 +1840,8 @@ export const computeIntegralMatchCumulativeScores = (
   timeline: SoccerTimelineResult,
   matchData: any,
   selectedConceptOrAgg: SoccerConcept | 'aggregate' = 'aggregate',
-  owaConfig: SoccerOwaConfig = { type: 'average', weights: Array(12).fill(1 / 12) },
-  dimAffinityMatrix: number[][] = Array.from({ length: 12 }, () => Array(12).fill(0)),
+  owaConfig: SoccerOwaConfig = { type: 'average', weights: Array(10).fill(0.1) },
+  dimAffinityMatrix: number[][] = Array.from({ length: 10 }, () => Array(10).fill(0)),
   synergyConfigs: Record<SoccerConcept, SynergyConfig> = {} as any,
   currentMinute: number = timeline?.totalMinutes ?? 120,
   propagationConfig: SoccerPropagationConfig = { type: 'maxRatio' },
