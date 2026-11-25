@@ -1,5 +1,6 @@
 import { OrdomaticaDataset } from './types';
 import { createRecreationMatchData2007644, DEFAULT_SOCCER_MATCH_URL } from './matchScraper';
+import { SoccerConcept } from './soccerAnalysis';
 
 export { DEFAULT_SOCCER_MATCH_URL };
 
@@ -41,6 +42,7 @@ export interface SoccerFlavourModelConfig {
   dimensionOverrides?: Record<string, any>;
   owaConfig?: any;
   dimAffinityMatrix?: number[][];
+  activeDimensions?: SoccerConcept[];
 }
 
 /**

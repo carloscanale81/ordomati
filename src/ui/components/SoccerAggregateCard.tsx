@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Layers, ChevronDown, ChevronUp, Trophy } from 'lucide-react';
 import { Card } from './Card';
 import {
   SoccerAggregatedAnalysis,
   SoccerOwaConfig,
+  SoccerConcept,
   SOCCER_CONCEPTS
 } from '../../logic/soccerAnalysis';
 import { useI18n } from '../i18n/I18nContext';
 
 export interface SoccerAggregateCardProps {
   analysis: SoccerAggregatedAnalysis;
+  activeDimensions?: SoccerConcept[];
   owaConfig?: SoccerOwaConfig;
   dimAffinityMatrix?: number[][];
   onUpdateOwa?: (next: SoccerOwaConfig) => void;
@@ -19,6 +21,7 @@ export interface SoccerAggregateCardProps {
 
 export const SoccerAggregateCard: React.FC<SoccerAggregateCardProps> = ({
   analysis,
+  activeDimensions,
   defaultCollapsed = false
 }) => {
   const { t } = useI18n();
@@ -27,6 +30,11 @@ export const SoccerAggregateCard: React.FC<SoccerAggregateCardProps> = ({
   const { players, scores, ranking, mvpPlayer, V } = analysis;
 
   const maxScore = scores && scores.length > 0 ? Math.max(...scores, 0.0001) : 1;
+
+  const visibleConcepts = useMemo(() => {
+    if (!activeDimensions || activeDimensions.length === 0) return SOCCER_CONCEPTS;
+    return SOCCER_CONCEPTS.filter(c => activeDimensions.includes(c.key));
+  }, [activeDimensions]);
 
   return (
     <Card
@@ -79,7 +87,7 @@ export const SoccerAggregateCard: React.FC<SoccerAggregateCardProps> = ({
                     <th className="p-2.5 text-center w-12">#</th>
                     <th className="p-2.5 text-left">{t('soccer.aggregate.colPlayer')}</th>
                     <th className="p-2.5 text-center w-14">{t('soccer.aggregate.colPos')}</th>
-                    {SOCCER_CONCEPTS.map(c => (
+                    {visibleConcepts.map(c => (
                       <th key={c.key} className="p-2 text-right font-mono text-[10px] whitespace-nowrap" title={`VP (${c.name})`}>
                         {c.name.slice(0, 3)}
                       </th>
@@ -131,7 +139,7 @@ export const SoccerAggregateCard: React.FC<SoccerAggregateCardProps> = ({
                             {player.position}
                           </span>
                         </td>
-                        {SOCCER_CONCEPTS.map((_, colIdx) => {
+                        {visibleConcepts.map((_, colIdx) => {
                           const vpVal = V[playerIdx]?.[colIdx] ?? 0;
                           return (
                             <td key={colIdx} className="p-2 text-right font-mono text-[11px] text-gray-600 dark:text-gray-400">

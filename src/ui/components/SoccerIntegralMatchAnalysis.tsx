@@ -37,6 +37,7 @@ export interface SoccerIntegralMatchAnalysisProps {
   matchData: any;
   owaConfig: SoccerOwaConfig;
   dimAffinityMatrix: number[][];
+  activeDimensions?: SoccerConcept[];
   synergyConfigs: Record<SoccerConcept, SynergyConfig>;
   synergyConfig?: SynergyConfig;
   propagationConfig?: SoccerPropagationConfig;
@@ -54,6 +55,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
   matchData,
   owaConfig,
   dimAffinityMatrix,
+  activeDimensions,
   synergyConfigs,
   synergyConfig,
   propagationConfig,
@@ -130,7 +132,8 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
       propagationConfigs,
       blockingConfigs,
       relativeConfigs,
-      equalizationConfigs
+      equalizationConfigs,
+      activeDimensions
     );
   }, [
     timeline,
@@ -148,7 +151,8 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
     propagationConfigs,
     blockingConfigs,
     relativeConfigs,
-    equalizationConfigs
+    equalizationConfigs,
+    activeDimensions
   ]);
 
   // Compute cumulative contextual affinity and distance matrix up to effectiveSliderMinute
@@ -310,7 +314,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
               <span>{t('soccer.integral.optionAggregate')}</span>
             </button>
 
-            {SOCCER_CONCEPTS.map(concept => (
+            {SOCCER_CONCEPTS.filter(c => !activeDimensions || activeDimensions.includes(c.key)).map(concept => (
               <button
                 key={concept.key}
                 type="button"

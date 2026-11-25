@@ -41,6 +41,7 @@ export interface SoccerReportOptions {
     equalizationConfig: SoccerEqualizationConfig;
     owaConfig: SoccerOwaConfig;
     dimAffinityMatrix: number[][];
+    activeDimensions?: SoccerConcept[];
   };
   language: 'es' | 'en';
 }
@@ -55,18 +56,18 @@ function escapeHtml(str: string | number | undefined | null): string {
 }
 
 /**
- * Renders the 12-dimension interdimensional affinity graph as a standalone vector SVG string.
+ * Renders the interdimensional affinity graph as a standalone vector SVG string for active dimensions.
  */
-function renderDimensionAffinityGraphSvg(matrix: number[][]): string {
+function renderDimensionAffinityGraphSvg(matrix: number[][], activeConcepts: typeof SOCCER_CONCEPTS): string {
   const W = 960;
   const H = 520;
   const cx = W / 2;
   const cy = H / 2;
   const rx = 400;
   const ry = 205;
-  const n = SOCCER_CONCEPTS.length;
+  const n = activeConcepts.length;
 
-  const nodes = SOCCER_CONCEPTS.map((concept, i) => {
+  const nodes = activeConcepts.map((concept, i) => {
     const theta = (2 * Math.PI * i) / n - Math.PI / 2;
     return {
       id: i,
@@ -423,6 +424,16 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
     timeZoneName: 'short'
   });
 
+  // Determine active concepts and active indices
+  const activeConcepts = SOCCER_CONCEPTS.filter(c =>
+    !config.activeDimensions || config.activeDimensions.includes(c.key)
+  );
+  const activeIndices = SOCCER_CONCEPTS
+    .map((c, i) => ({ key: c.key, idx: i }))
+    .filter(item => !config.activeDimensions || config.activeDimensions.includes(item.key))
+    .map(item => item.idx);
+  const activeDimAffinity = activeIndices.map(r => activeIndices.map(c => config.dimAffinityMatrix[r]?.[c] ?? 0.5));
+
   // 1. Compute Integrated Results at the end of the match
   const finalMinute = timeline.totalMinutes || 120;
   let integralResult: IntegralMatchAnalysisResult | null = null;
@@ -441,7 +452,13 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
       config.propagationConfig,
       config.blockingConfig,
       config.relativeConfig,
-      config.equalizationConfig
+      config.equalizationConfig,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      config.activeDimensions
     );
     homeFinalAffinity = computeIntegralCumulativeAffinity(
       timeline,
@@ -497,7 +514,8 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
         seg,
         config.owaConfig,
         config.dimAffinityMatrix,
-        config.equalizationConfig
+        config.equalizationConfig,
+        config.activeDimensions
       );
       segmentReports.push({
         segment: seg,
@@ -1049,6 +1067,11 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
         </thead>
         <tbody>
           <tr>
+            <td><strong>${isEs ? 'Dimensiones Activas en el Análisis' : 'Active Analysis Dimensions'}</strong></td>
+            <td><strong>${activeConcepts.length} / ${SOCCER_CONCEPTS.length}</strong></td>
+            <td>${activeConcepts.map(c => `<code>${escapeHtml(c.name)}</code>`).join(', ')}</td>
+          </tr>
+          <tr>
             <td><strong>${isEs ? 'Función de Propagación' : 'Propagation Function'}</strong></td>
             <td><code>${escapeHtml(config.propagationConfig.type)}</code></td>
             <td>${isEs ? 'Diagonal = 1, elementos fuera de diagonal = d(i,j) / d_max' : 'Diagonal = 1, off-diagonal = d(i,j) / d_max'}</td>
@@ -1076,18 +1099,24 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
       <h3>1.2 ${isEs ? 'Perfil de Referencia (Operador OWA)' : 'Reference Profile (OWA Operator)'}</h3>
       <p style="font-size: 9.5pt; color: #475569;">
         ${isEs
-          ? `Perfil seleccionado: <strong>${escapeHtml(config.owaConfig.type)}</strong>. Los pesos ordenados determinan el grado de compensación u optimismo en la agregación multicriterio:`
-          : `Selected profile: <strong>${escapeHtml(config.owaConfig.type)}</strong>. Ordered weights define compensation or optimism in multi-criteria aggregation:`}
+          ? `Perfil seleccionado: <strong>${escapeHtml(config.owaConfig.type)}</strong>. Los pesos ordenados determinan el grado de compensación u optimismo en la agregación multicriterio (normalizados a las ${activeConcepts.length} dimensiones activas):`
+          : `Selected profile: <strong>${escapeHtml(config.owaConfig.type)}</strong>. Ordered weights define compensation or optimism in multi-criteria aggregation (normalized to ${activeConcepts.length} active dimensions):`}
       </p>
       <table class="data-table" style="table-layout: fixed;">
         <thead>
           <tr>
-            ${config.owaConfig.weights.map((_, i) => `<th style="text-align: center;">w${i + 1}</th>`).join('')}
+            ${activeConcepts.map((_, i) => `<th style="text-align: center;">w${i + 1}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
           <tr>
-            ${config.owaConfig.weights.map(w => `<td class="num" style="text-align: center;">${fmtNum(w, 4)}</td>`).join('')}
+            ${(() => {
+              const rawW = config.owaConfig.weights || [];
+              const sliced = rawW.slice(0, activeConcepts.length);
+              const sum = sliced.reduce((a, b) => a + b, 0);
+              const norm = sum > 0 ? sliced.map(w => w / sum) : activeConcepts.map(() => 1 / activeConcepts.length);
+              return norm.map(w => `<td class="num" style="text-align: center;">${fmtNum(w, 4)}</td>`).join('');
+            })()}
           </tr>
         </tbody>
       </table>
@@ -1096,17 +1125,17 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
     <div id="sec-config-matrix" style="margin-bottom: 20px;">
       <h3>1.3 ${isEs ? 'Matriz de Afinidad Interdimensional (C)' : 'Interdimensional Affinity Matrix (C)'}</h3>
       <p style="font-size: 9pt; color: #475569;">
-        ${isEs ? 'Afinidad conceptual entre las 10 dimensiones del juego analizadas:' : 'Conceptual affinity across the 10 tactical dimensions:'}
+        ${isEs ? `Afinidad conceptual entre las ${activeConcepts.length} dimensiones activas en el análisis:` : `Conceptual affinity across the ${activeConcepts.length} active dimensions:`}
       </p>
       <table class="matrix-table">
         <thead>
           <tr>
             <th></th>
-            ${SOCCER_CONCEPTS.map((c, i) => `<th title="${escapeHtml(c.name)}">D${i + 1}</th>`).join('')}
+            ${activeConcepts.map((c, i) => `<th title="${escapeHtml(c.name)}">D${i + 1}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
-          ${config.dimAffinityMatrix
+          ${activeDimAffinity
             .map((row, i) => {
               const cells = row
                 .map((val, j) => {
@@ -1124,7 +1153,7 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
 
     <div id="sec-config-graph" class="avoid-break" style="margin-top: 24px;">
       <h3>1.4 ${isEs ? 'Grafo de Afinidad entre Dimensiones' : 'Dimension Affinity Graph'}</h3>
-      ${renderDimensionAffinityGraphSvg(config.dimAffinityMatrix)}
+      ${renderDimensionAffinityGraphSvg(activeDimAffinity, activeConcepts)}
     </div>
   </div>
 
@@ -1603,13 +1632,15 @@ export function generateSoccerPdfReportHtml(options: SoccerReportOptions): strin
             </table>
           </div>
 
-          <!-- 12 Dimensions Breakdown -->
+          <!-- Active Dimensions Breakdown -->
           <div>
             <div style="font-size: 8pt; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
-              ${isEs ? 'Puntuación Acumulada en las 10 Dimensiones' : 'Cumulative 10-Dimensional Scores'}
+              ${isEs ? `Puntuación Acumulada en las ${activeConcepts.length} Dimensiones Activas` : `Cumulative ${activeConcepts.length} Active Dimensions Scores`}
             </div>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 7.5pt;">
-              ${(fm.dimCumulativeScores || []).map((dim: any) => `
+              ${(fm.dimCumulativeScores || [])
+                .filter((dim: any) => !config.activeDimensions || config.activeDimensions.includes(dim.concept))
+                .map((dim: any) => `
                 <div style="padding: 4px 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                   <span style="color: #334155; font-weight: 600;">${escapeHtml(dim.conceptName)}:</span>
                   <span style="font-family: monospace; font-weight: 800; color: #4338ca;">${fmtNum(dim.cumulativeVp, 3)}</span>

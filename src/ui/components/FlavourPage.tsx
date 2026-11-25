@@ -501,7 +501,29 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
   const [soccerDimAffinity, setSoccerDimAffinity] = useState<number[][]>(() =>
     DEFAULT_SOCCER_DIM_AFFINITY.map(row => [...row])
   );
+  const [activeDimensions, setActiveDimensions] = useState<SoccerConcept[]>(() =>
+    SOCCER_CONCEPTS.map(c => c.key)
+  );
   const [isGeneratingSoccerReport, setIsGeneratingSoccerReport] = useState<boolean>(false);
+
+  const handleToggleDimension = (concept: SoccerConcept, active: boolean) => {
+    setActiveDimensions(prev => {
+      if (active) {
+        return prev.includes(concept) ? prev : [...prev, concept];
+      } else {
+        if (prev.length <= 1 && prev.includes(concept)) return prev;
+        return prev.filter(k => k !== concept);
+      }
+    });
+  };
+
+  const handleToggleAllDimensions = (active: boolean) => {
+    if (active) {
+      setActiveDimensions(SOCCER_CONCEPTS.map(c => c.key));
+    } else {
+      setActiveDimensions([SOCCER_CONCEPTS[0].key]);
+    }
+  };
 
   // Memoize parsed match data object exclusively for soccer flavour (no cached fallback on initial load)
   const parsedSoccerMatchData = useMemo(() => {
@@ -683,7 +705,8 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
         activeSegment,
         soccerOwaConfig,
         soccerDimAffinity,
-        eqCfg
+        eqCfg,
+        activeDimensions
       );
     } catch (err) {
       console.warn('Failed to compute soccer aggregated analysis', err);
@@ -696,7 +719,8 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     soccerDimAffinity,
     dimensionOverrides,
     soccerEqualizationConfig,
-    soccerEqualizationConfigs
+    soccerEqualizationConfigs,
+    activeDimensions
   ]);
 
   const definition = FLAVOUR_DEFINITIONS[flavourCase.flavour];
@@ -955,7 +979,8 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
           equalizationConfig: soccerEqualizationConfig,
           dimensionOverrides,
           owaConfig: soccerOwaConfig,
-          dimAffinityMatrix: soccerDimAffinity
+          dimAffinityMatrix: soccerDimAffinity,
+          activeDimensions
         }
       };
     }
@@ -1008,6 +1033,9 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
         }
         if (Array.isArray(smc.dimAffinityMatrix)) {
           setSoccerDimAffinity(smc.dimAffinityMatrix);
+        }
+        if (Array.isArray(smc.activeDimensions) && smc.activeDimensions.length > 0) {
+          setActiveDimensions(smc.activeDimensions);
         }
       }
 
@@ -1100,7 +1128,8 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
           relativeConfig: soccerRelativeConfig,
           equalizationConfig: soccerEqualizationConfig,
           owaConfig: soccerOwaConfig,
-          dimAffinityMatrix: soccerDimAffinity
+          dimAffinityMatrix: soccerDimAffinity,
+          activeDimensions
         },
         language
       });
@@ -1299,7 +1328,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                     }, 60);
                   }
                 }}
-                analyses={soccerDimAnalyses}
+                analyses={soccerDimAnalyses.filter(a => activeDimensions.includes(a.concept))}
                 activeConcept={activeConcept}
                 onSelectConcept={concept => {
                   setActiveConcept(concept);
@@ -1807,6 +1836,9 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                       onUpdateOwa={setSoccerOwaConfig}
                       dimAffinityMatrix={soccerDimAffinity}
                       onUpdateDimAffinity={setSoccerDimAffinity}
+                      activeDimensions={activeDimensions}
+                      onToggleDimension={handleToggleDimension}
+                      onToggleAllDimensions={handleToggleAllDimensions}
                     />
                   )}
                 </Card>
@@ -1927,8 +1959,8 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                     </Card>
                   )}
 
-                  {/* 12 Dimension Cards */}
-                  {soccerDimAnalyses.map(analysis => {
+                  {/* 10 Dimension Cards (only active dimensions) */}
+                  {soccerDimAnalyses.filter(a => activeDimensions.includes(a.concept)).map(analysis => {
                     const isActive = activeConcept === analysis.concept;
                     return (
                       <div
@@ -1980,6 +2012,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                   {soccerAggAnalysis && (
                     <SoccerAggregateCard
                       analysis={soccerAggAnalysis}
+                      activeDimensions={activeDimensions}
                     />
                   )}
                 </div>
@@ -1993,6 +2026,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                     matchData={parsedSoccerMatchData}
                     owaConfig={soccerOwaConfig}
                     dimAffinityMatrix={soccerDimAffinity}
+                    activeDimensions={activeDimensions}
                     synergyConfigs={effectiveSoccerSynergyConfigs}
                     synergyConfig={soccerSynergyConfig}
                     propagationConfig={soccerPropagationConfig}

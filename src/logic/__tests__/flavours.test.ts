@@ -985,3 +985,76 @@ test('computeSoccerDimensionalAnalysis correctly applies relative adjustment (ca
     assert.notEqual(analysisByMinutes.ca[morataIdx], analysisByMinutes.ca[laporteIdx]);
   }
 });
+
+test('computeSoccerAggregatedAnalysis and integral analysis respect activeDimensions filter', () => {
+  const matchData = createRecreationMatchData2007644();
+  const timeline = parseSoccerTimeline(matchData);
+  const seg = timeline.homeSegments[0];
+
+  const dimAnalyses = SOCCER_CONCEPTS.map(c =>
+    computeSoccerDimensionalAnalysis(
+      matchData,
+      seg,
+      true,
+      { type: 'none', k: 1.0 },
+      c.key,
+      { type: 'maxRatio' },
+      { type: 'none' },
+      { type: 'none' }
+    )
+  );
+
+  const owaConfig = { type: 'average' as const, weights: [...SOCCER_OWA_PRESETS.average] };
+  const dimAffinity = DEFAULT_SOCCER_DIM_AFFINITY.map(r => [...r]);
+
+  // Full 10 dimensions analysis
+  const fullAgg = computeSoccerAggregatedAnalysis(
+    dimAnalyses,
+    seg,
+    owaConfig,
+    dimAffinity
+  );
+  assert.equal(fullAgg.V[0].length, 10);
+
+  // Subset of 3 active dimensions from SOCCER_CONCEPTS: goals, touches, clearances
+  const activeSubset: SoccerConcept[] = ['goals', 'touches', 'clearances'];
+  const subsetAgg = computeSoccerAggregatedAnalysis(
+    dimAnalyses,
+    seg,
+    owaConfig,
+    dimAffinity,
+    undefined,
+    activeSubset
+  );
+  assert.equal(subsetAgg.V[0].length, 3);
+  assert.equal(subsetAgg.scores.length, seg.activePlayers.length);
+
+  // Cumulative integral analysis with activeDimensions subset
+  const synergyConfigs = Object.fromEntries(
+    SOCCER_CONCEPTS.map(c => [c.key, { type: 'none', k: 1.0 }])
+  ) as Record<SoccerConcept, { type: 'none'; k: 1.0 }>;
+
+  const integralRes = computeIntegralMatchCumulativeScores(
+    timeline,
+    matchData,
+    'aggregate',
+    owaConfig,
+    dimAffinity,
+    synergyConfigs,
+    45,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    activeSubset
+  );
+
+  assert.ok(integralRes.homePlayers.length > 0);
+  assert.ok(integralRes.awayPlayers.length > 0);
+  assert.ok(integralRes.matchMvp);
+});

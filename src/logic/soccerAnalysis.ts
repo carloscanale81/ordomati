@@ -1499,39 +1499,65 @@ export const computeSoccerAggregatedAnalysis = (
   segment: TimelineSegment,
   owaConfig: SoccerOwaConfig = { type: 'average', weights: SOCCER_OWA_PRESETS.average },
   dimAffinityMatrix: number[][] = DEFAULT_SOCCER_DIM_AFFINITY,
-  equalizationConfig: SoccerEqualizationConfig | SoccerEqualizationConfig[] = { type: 'max' }
+  equalizationConfig: SoccerEqualizationConfig | SoccerEqualizationConfig[] = { type: 'max' },
+  activeDimensions?: SoccerConcept[]
 ): SoccerAggregatedAnalysis => {
   const players = segment.activePlayers;
   const n = players.length;
-  const m = SOCCER_CONCEPTS.length;
+
+  // Filter dimensions if activeDimensions is provided
+  const activeSet = activeDimensions && activeDimensions.length > 0
+    ? new Set(activeDimensions)
+    : new Set(SOCCER_CONCEPTS.map(c => c.key));
+
+  const activeIndices = SOCCER_CONCEPTS
+    .map((c, idx) => ({ concept: c.key, idx }))
+    .filter(item => activeSet.has(item.concept))
+    .map(item => item.idx);
+
+  const m = activeIndices.length > 0 ? activeIndices.length : SOCCER_CONCEPTS.length;
+  const indicesToUse = activeIndices.length > 0 ? activeIndices : SOCCER_CONCEPTS.map((_, i) => i);
 
   // Normalize OWA weights ensuring array length matches m
   let rawWeights = owaConfig.weights || SOCCER_OWA_PRESETS.average;
-  if (!Array.isArray(rawWeights) || rawWeights.length !== m) {
-    rawWeights = SOCCER_OWA_PRESETS[owaConfig.type] || SOCCER_OWA_PRESETS.average;
+  let owaSubWeights: number[] = [];
+  if (Array.isArray(rawWeights) && rawWeights.length === SOCCER_CONCEPTS.length && m < SOCCER_CONCEPTS.length) {
+    owaSubWeights = indicesToUse.map(i => rawWeights[i] ?? (1 / m));
+  } else if (Array.isArray(rawWeights) && rawWeights.length === m) {
+    owaSubWeights = [...rawWeights];
+  } else {
+    const preset = SOCCER_OWA_PRESETS[owaConfig.type] || SOCCER_OWA_PRESETS.average;
+    owaSubWeights = indicesToUse.map(i => preset[i] ?? (1 / m));
   }
-  const weightSum = rawWeights.reduce((a, b) => a + b, 0);
+  const weightSum = owaSubWeights.reduce((a, b) => a + b, 0);
   const normalizedOwaWeights =
-    weightSum > 0 ? rawWeights.map(w => w / weightSum) : Array(m).fill(1 / m);
+    weightSum > 0 ? owaSubWeights.map(w => w / weightSum) : Array(m).fill(1 / m);
 
-  // 1. Build matrix V [n x m] of Own Values (clamped >= 0)
+  // 1. Build matrix V [n x m] of Own Values (clamped >= 0) for active dimensions
   const V: number[][] = Array.from({ length: n }, () => Array(m).fill(0));
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < m; j++) {
-      const dim = dimAnalyses[j];
+      const originalIdx = indicesToUse[j];
+      const dim = dimAnalyses[originalIdx];
       const val = dim?.VP ? dim.VP[i] : dim?.VC ? dim.VC[i] : 0;
       V[i][j] = Math.max(0, Number(val) || 0);
     }
   }
 
   // 1b. Equalization adjustment via unified computeEqualizationMatrix:
-  const equalizedV = computeEqualizationMatrix(V, equalizationConfig);
+  const subEqualizationConfig = Array.isArray(equalizationConfig)
+    ? indicesToUse.map(i => equalizationConfig[i] || { type: 'max' as const })
+    : equalizationConfig;
+  const equalizedV = computeEqualizationMatrix(V, subEqualizationConfig);
 
-  // Ensure dimension affinity matrix is m x m
-  let cMatrix = dimAffinityMatrix;
-  if (!cMatrix || cMatrix.length !== m || cMatrix[0]?.length !== m) {
-    cMatrix = DEFAULT_SOCCER_DIM_AFFINITY;
+  // Sub-matrix of dimension affinity C [m x m]
+  let fullCMatrix = dimAffinityMatrix;
+  if (!fullCMatrix || fullCMatrix.length !== SOCCER_CONCEPTS.length || fullCMatrix[0]?.length !== SOCCER_CONCEPTS.length) {
+    fullCMatrix = DEFAULT_SOCCER_DIM_AFFINITY;
   }
+  const cMatrix: number[][] = Array.from({ length: m }, (_, r) =>
+    Array.from({ length: m }, (_, c) => fullCMatrix[indicesToUse[r]][indicesToUse[c]] ?? (r === c ? 1 : 0.5))
+  );
 
   // 2. Normalize criteria correlation matrix C
   const normalizedAffinity = normalizeCorrelationMatrix(cMatrix, m);
@@ -1898,7 +1924,8 @@ export const computeIntegralMatchCumulativeScores = (
   propagationConfigs?: Record<SoccerConcept, SoccerPropagationConfig>,
   blockingConfigs?: Record<SoccerConcept, SoccerBlockingConfig>,
   relativeConfigs?: Record<SoccerConcept, SoccerRelativeAdjustmentConfig>,
-  equalizationConfigs?: Record<SoccerConcept, SoccerEqualizationConfig>
+  equalizationConfigs?: Record<SoccerConcept, SoccerEqualizationConfig>,
+  activeDimensions?: SoccerConcept[]
 ): IntegralMatchAnalysisResult => {
   const totalMinutes = timeline.totalMinutes;
   const clampedMinute = Math.min(Math.max(0, currentMinute), totalMinutes);
@@ -1988,7 +2015,8 @@ export const computeIntegralMatchCumulativeScores = (
         seg,
         owaConfig,
         dimAffinityMatrix,
-        effectiveEqConfig
+        effectiveEqConfig,
+        activeDimensions
       );
 
       // Record segment breakdown for each participating player
