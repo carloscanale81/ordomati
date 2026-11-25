@@ -38,10 +38,15 @@ export interface SoccerIntegralMatchAnalysisProps {
   owaConfig: SoccerOwaConfig;
   dimAffinityMatrix: number[][];
   synergyConfigs: Record<SoccerConcept, SynergyConfig>;
+  synergyConfig?: SynergyConfig;
   propagationConfig?: SoccerPropagationConfig;
   blockingConfig?: SoccerBlockingConfig;
   relativeConfig?: SoccerRelativeAdjustmentConfig;
   equalizationConfig?: SoccerEqualizationConfig;
+  propagationConfigs?: Record<SoccerConcept, SoccerPropagationConfig>;
+  blockingConfigs?: Record<SoccerConcept, SoccerBlockingConfig>;
+  relativeConfigs?: Record<SoccerConcept, SoccerRelativeAdjustmentConfig>;
+  equalizationConfigs?: Record<SoccerConcept, SoccerEqualizationConfig>;
 }
 
 export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisProps> = ({
@@ -50,10 +55,15 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
   owaConfig,
   dimAffinityMatrix,
   synergyConfigs,
+  synergyConfig,
   propagationConfig,
   blockingConfig,
   relativeConfig,
-  equalizationConfig
+  equalizationConfig,
+  propagationConfigs,
+  blockingConfigs,
+  relativeConfigs,
+  equalizationConfigs
 }) => {
   const { t } = useI18n();
 
@@ -115,7 +125,12 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
       propagationConfig,
       blockingConfig,
       relativeConfig,
-      equalizationConfig
+      equalizationConfig,
+      synergyConfig,
+      propagationConfigs,
+      blockingConfigs,
+      relativeConfigs,
+      equalizationConfigs
     );
   }, [
     timeline,
@@ -128,14 +143,20 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
     propagationConfig,
     blockingConfig,
     relativeConfig,
-    equalizationConfig
+    equalizationConfig,
+    synergyConfig,
+    propagationConfigs,
+    blockingConfigs,
+    relativeConfigs,
+    equalizationConfigs
   ]);
 
   // Compute cumulative contextual affinity and distance matrix up to effectiveSliderMinute
+  // Active general synergy config (if not overridden per dimension) or from selected concept
   const activeSynergyConfig =
     selectedConceptOrAgg === 'aggregate'
-      ? synergyConfigs['dribblesWon'] || { type: 'factor', k: 1.0 }
-      : synergyConfigs[selectedConceptOrAgg] || { type: 'factor', k: 1.0 };
+      ? synergyConfig || synergyConfigs?.['dribblesWon'] || { type: 'none', k: 1.0 }
+      : synergyConfigs?.[selectedConceptOrAgg] || synergyConfig || { type: 'none', k: 1.0 };
 
   const homeCumulativeAffinity = useMemo(() => {
     return computeIntegralCumulativeAffinity(
@@ -608,7 +629,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
             {/* Player Performance Cards List */}
             <div className="space-y-2 flex-1 overflow-y-auto pr-1">
               {homePlayers.map((item, idx) => {
-                const key = item.player.id || item.player.name;
+                const key = `home_${item.player.id || item.player.name}`;
                 return (
                   <ErrorBoundary key={key} fallbackTitle={`Error en jugador: ${item.player.name}`}>
                     <SoccerIntegralPlayerCard
@@ -696,7 +717,7 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
             {/* Player Performance Cards List */}
             <div className="space-y-2 flex-1 overflow-y-auto pr-1">
               {awayPlayers.map((item, idx) => {
-                const key = item.player.id || item.player.name;
+                const key = `away_${item.player.id || item.player.name}`;
                 return (
                   <ErrorBoundary key={key} fallbackTitle={`Error en jugador: ${item.player.name}`}>
                     <SoccerIntegralPlayerCard

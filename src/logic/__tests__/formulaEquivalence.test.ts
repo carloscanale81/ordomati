@@ -159,11 +159,11 @@ test('Formula Equivalence: Soccer MVP formulas match custom evaluation', () => {
   assert.strictEqual(customBlock, expectedBlock);
 
   // Relative byMinutes
-  const m = 45;
-  const T = 90;
-  const relMinutesCode = 'minutos / minutos_totales';
-  const expectedRel = m / T;
-  const customRel = evaluateMathExpression(relMinutesCode, { minutos: m, minutos_totales: T });
+  const dur_intervalo = 30;
+  const minutos_jugados = 15;
+  const relMinutesCode = 'dur_intervalo / minutos_jugados';
+  const expectedRel = dur_intervalo / minutos_jugados;
+  const customRel = evaluateMathExpression(relMinutesCode, { dur_intervalo, minutos_jugados });
   assert.strictEqual(customRel, expectedRel);
 
   // Equalization max

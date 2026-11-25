@@ -364,21 +364,13 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     SOCCER_CONCEPTS.forEach(c => { init[c.key] = { type: 'none' }; });
     return init;
   });
-  const [soccerSynergyConfigs, setSoccerSynergyConfigs] = useState<Record<SoccerConcept, SynergyConfig>>({
-    dribblesWon: { type: 'none', k: 1.0 },
-    goals: { type: 'none', k: 1.0 },
-    aerial: { type: 'none', k: 1.0 },
-    shotsOnTarget: { type: 'none', k: 1.0 },
-    touches: { type: 'none', k: 1.0 },
-    passAccuracy: { type: 'none', k: 1.0 },
-    accuratePasses: { type: 'none', k: 1.0 },
-    keyPasses: { type: 'none', k: 1.0 },
-    tacklesSuccessful: { type: 'none', k: 1.0 },
-    clearances: { type: 'none', k: 1.0 },
-    interceptions: { type: 'none', k: 1.0 },
-    cornerAccuracy: { type: 'none', k: 1.0 },
-    dribbles: { type: 'none', k: 1.0 },
-    shots: { type: 'none', k: 1.0 }
+  const [soccerSynergyConfigs, setSoccerSynergyConfigs] = useState<Record<SoccerConcept, SynergyConfig>>(() => {
+    const init: any = {
+      dribbles: { type: 'none', k: 1.0 },
+      shots: { type: 'none', k: 1.0 }
+    };
+    SOCCER_CONCEPTS.forEach(c => { init[c.key] = { type: 'none', k: 1.0 }; });
+    return init;
   });
   const [soccerRelativeConfigs, setSoccerRelativeConfigs] = useState<Record<SoccerConcept, SoccerRelativeAdjustmentConfig>>(() => {
     const init: any = {};
@@ -391,7 +383,56 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     return init;
   });
 
-  // Check if a function is overridden in all 12 dimensions
+  // Effective synergy configs passed to integral analysis: dimensions without override inherit soccerSynergyConfig
+  const effectiveSoccerSynergyConfigs = useMemo(() => {
+    const res: Record<SoccerConcept, SynergyConfig> = {} as any;
+    SOCCER_CONCEPTS.forEach(c => {
+      res[c.key] = dimensionOverrides[c.key]?.synergy
+        ? (soccerSynergyConfigs[c.key] || { type: 'none', k: 1.0 })
+        : soccerSynergyConfig;
+    });
+    return res;
+  }, [dimensionOverrides, soccerSynergyConfigs, soccerSynergyConfig]);
+
+  const effectiveSoccerPropagationConfigs = useMemo(() => {
+    const res: Record<SoccerConcept, SoccerPropagationConfig> = {} as any;
+    SOCCER_CONCEPTS.forEach(c => {
+      res[c.key] = dimensionOverrides[c.key]?.propagation
+        ? (soccerPropagationConfigs[c.key] || { type: 'maxRatio' })
+        : soccerPropagationConfig;
+    });
+    return res;
+  }, [dimensionOverrides, soccerPropagationConfigs, soccerPropagationConfig]);
+
+  const effectiveSoccerBlockingConfigs = useMemo(() => {
+    const res: Record<SoccerConcept, SoccerBlockingConfig> = {} as any;
+    SOCCER_CONCEPTS.forEach(c => {
+      res[c.key] = dimensionOverrides[c.key]?.blocking
+        ? (soccerBlockingConfigs[c.key] || { type: 'none' })
+        : soccerBlockingConfig;
+    });
+    return res;
+  }, [dimensionOverrides, soccerBlockingConfigs, soccerBlockingConfig]);
+
+  const effectiveSoccerRelativeConfigs = useMemo(() => {
+    const res: Record<SoccerConcept, SoccerRelativeAdjustmentConfig> = {} as any;
+    SOCCER_CONCEPTS.forEach(c => {
+      res[c.key] = dimensionOverrides[c.key]?.relative
+        ? (soccerRelativeConfigs[c.key] || { type: 'none' })
+        : soccerRelativeConfig;
+    });
+    return res;
+  }, [dimensionOverrides, soccerRelativeConfigs, soccerRelativeConfig]);
+
+  const effectiveSoccerEqualizationConfigs = useMemo(() => {
+    const res: Record<SoccerConcept, SoccerEqualizationConfig> = {} as any;
+    SOCCER_CONCEPTS.forEach(c => {
+      res[c.key] = dimensionOverrides[c.key]?.equalization
+        ? (soccerEqualizationConfigs[c.key] || { type: 'max' })
+        : soccerEqualizationConfig;
+    });
+    return res;
+  }, [dimensionOverrides, soccerEqualizationConfigs, soccerEqualizationConfig]);
   const isAllPropagationOverridden = useMemo(
     () => SOCCER_CONCEPTS.every(c => dimensionOverrides[c.key]?.propagation),
     [dimensionOverrides]
@@ -1952,11 +1993,16 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
                     matchData={parsedSoccerMatchData}
                     owaConfig={soccerOwaConfig}
                     dimAffinityMatrix={soccerDimAffinity}
-                    synergyConfigs={soccerSynergyConfigs}
+                    synergyConfigs={effectiveSoccerSynergyConfigs}
+                    synergyConfig={soccerSynergyConfig}
                     propagationConfig={soccerPropagationConfig}
                     blockingConfig={soccerBlockingConfig}
                     relativeConfig={soccerRelativeConfig}
                     equalizationConfig={soccerEqualizationConfig}
+                    propagationConfigs={effectiveSoccerPropagationConfigs}
+                    blockingConfigs={effectiveSoccerBlockingConfigs}
+                    relativeConfigs={effectiveSoccerRelativeConfigs}
+                    equalizationConfigs={effectiveSoccerEqualizationConfigs}
                   />
                 </div>
               )}

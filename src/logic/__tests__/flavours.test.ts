@@ -334,7 +334,7 @@ test('computeSoccerDimensionalAnalysis generates A matrix, applies synergy to AC
     `Total value must be conserved without synergy: sum(VP)=${sumVP} vs sum(VC)=${sumVC}`
   );
 
-  // 3. Synergy factor modulation
+  // 3. Synergy factor modulation: verifies synergy changes AC and recalculates VP accordingly
   const factorAnalysis = computeSoccerDimensionalAnalysis(matchData, firstSeg, true, { type: 'factor', k: 0.5 });
   // Off-diagonal in factorAnalysis should be half of AAI
   for (let i = 0; i < 11; i++) {
@@ -347,6 +347,10 @@ test('computeSoccerDimensionalAnalysis generates A matrix, applies synergy to AC
       }
     }
   }
+
+  // VP changes when synergy changes (because (AC)^-1 changes)
+  assert.notDeepEqual(factorAnalysis.VP, solvedAnalysis.VP, 'VP calculation must change when synergy function changes');
+  assert.notDeepEqual(factorAnalysis.AC, solvedAnalysis.AC, 'AC matrix must change when synergy function changes');
 });
 
 test('computeSoccerDimensionalAnalysis supports all 10 dimensions including Regates ganados and Tiros a puerta', () => {
@@ -482,13 +486,11 @@ test('computeIntegralMatchCumulativeScores accumulates player performance across
     aerial: { type: 'factor' as const, k: 1.0 },
     shotsOnTarget: { type: 'factor' as const, k: 1.0 },
     touches: { type: 'factor' as const, k: 1.0 },
-    passAccuracy: { type: 'factor' as const, k: 1.0 },
     accuratePasses: { type: 'factor' as const, k: 1.0 },
     keyPasses: { type: 'factor' as const, k: 1.0 },
     tacklesSuccessful: { type: 'factor' as const, k: 1.0 },
     clearances: { type: 'factor' as const, k: 1.0 },
     interceptions: { type: 'factor' as const, k: 1.0 },
-    cornerAccuracy: { type: 'factor' as const, k: 1.0 },
     dribbles: { type: 'factor' as const, k: 1.0 },
     shots: { type: 'factor' as const, k: 1.0 }
   };
@@ -535,6 +537,90 @@ test('computeIntegralMatchCumulativeScores accumulates player performance across
   const midScoreYamal = midResult.homePlayers.find(p => p.player.name === 'Lamine Yamal')?.cumulativeScore || 0;
   const fullScoreYamal = fullResult.homePlayers.find(p => p.player.name === 'Lamine Yamal')?.cumulativeScore || 0;
   assert.ok(fullScoreYamal >= midScoreYamal, 'Cumulative score must grow monotonically with minutes');
+
+  // Verify that varying general synergy factor changes cumulative player scores
+  const modifiedSynergyResult = computeIntegralMatchCumulativeScores(
+    timeline,
+    matchData,
+    'aggregate',
+    owaConfig,
+    DEFAULT_SOCCER_DIM_AFFINITY,
+    {} as any,
+    120,
+    { type: 'maxRatio' },
+    { type: 'none' },
+    { type: 'none' },
+    { type: 'max' },
+    { type: 'factor', k: 0.5 }
+  );
+  assert.notDeepEqual(
+    modifiedSynergyResult.homePlayers.map(p => p.cumulativeScore),
+    fullResult.homePlayers.map(p => p.cumulativeScore),
+    'Cumulative player scores must change when synergy factor k varies'
+  );
+
+  // Verify that modifying general relativeConfig propagates to dimensions and changes cumulative scores
+  const modifiedRelativeResult = computeIntegralMatchCumulativeScores(
+    timeline,
+    matchData,
+    'aggregate',
+    owaConfig,
+    DEFAULT_SOCCER_DIM_AFFINITY,
+    {} as any,
+    120,
+    { type: 'maxRatio' },
+    { type: 'none' },
+    { type: 'custom', customExpr: 'vc > 2 ? 1.5 : 0.8' },
+    { type: 'max' },
+    { type: 'none', k: 1.0 }
+  );
+  assert.notDeepEqual(
+    modifiedRelativeResult.homePlayers.map(p => p.cumulativeScore),
+    fullResult.homePlayers.map(p => p.cumulativeScore),
+    'Cumulative player scores must change when general relativeConfig changes'
+  );
+
+  // Verify that modifying general propagationConfig propagates and changes cumulative scores
+  const modifiedPropagationResult = computeIntegralMatchCumulativeScores(
+    timeline,
+    matchData,
+    'aggregate',
+    owaConfig,
+    DEFAULT_SOCCER_DIM_AFFINITY,
+    {} as any,
+    120,
+    { type: 'inhibited' },
+    { type: 'none' },
+    { type: 'none' },
+    { type: 'max' },
+    { type: 'none', k: 1.0 }
+  );
+  assert.notDeepEqual(
+    modifiedPropagationResult.homePlayers.map(p => p.cumulativeScore),
+    fullResult.homePlayers.map(p => p.cumulativeScore),
+    'Cumulative player scores must change when general propagationConfig changes'
+  );
+
+  // Verify that modifying general equalizationConfig propagates and changes cumulative scores
+  const modifiedEqualizationResult = computeIntegralMatchCumulativeScores(
+    timeline,
+    matchData,
+    'aggregate',
+    owaConfig,
+    DEFAULT_SOCCER_DIM_AFFINITY,
+    {} as any,
+    120,
+    { type: 'maxRatio' },
+    { type: 'none' },
+    { type: 'none' },
+    { type: 'sum' },
+    { type: 'none', k: 1.0 }
+  );
+  assert.notDeepEqual(
+    modifiedEqualizationResult.homePlayers.map(p => p.cumulativeScore),
+    fullResult.homePlayers.map(p => p.cumulativeScore),
+    'Cumulative player scores must change when general equalizationConfig changes'
+  );
 });
 
 test('computeIntegralCumulativeAffinity accumulates contextual affinity and passes across match timeline', () => {
@@ -774,13 +860,11 @@ test('Pipeline configuration functions and defaults (propagation, blocking, syne
       aerial: { type: 'none', k: 1.0 },
       shotsOnTarget: { type: 'none', k: 1.0 },
       touches: { type: 'none', k: 1.0 },
-      passAccuracy: { type: 'none', k: 1.0 },
       accuratePasses: { type: 'none', k: 1.0 },
       keyPasses: { type: 'none', k: 1.0 },
       tacklesSuccessful: { type: 'none', k: 1.0 },
       clearances: { type: 'none', k: 1.0 },
       interceptions: { type: 'none', k: 1.0 },
-      cornerAccuracy: { type: 'none', k: 1.0 },
       dribbles: { type: 'none', k: 1.0 },
       shots: { type: 'none', k: 1.0 }
     },
@@ -793,4 +877,111 @@ test('Pipeline configuration functions and defaults (propagation, blocking, syne
   assert.ok(integralRes.homePlayers.length > 0);
   assert.ok(integralRes.awayPlayers.length > 0);
   assert.ok(integralRes.matchMvp !== null);
+});
+
+test('layoutSoccerPitchNodesHorizontal renders players according to JSON formation coordinates', () => {
+  const matchData = {
+    home: {
+      teamId: 100,
+      name: 'España',
+      formations: [
+        {
+          formationId: 8,
+          formationName: '4231',
+          startMinuteExpanded: 0,
+          endMinuteExpanded: 90,
+          playerIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          formationPositions: [
+            { vertical: 0, horizontal: 5 },
+            { vertical: 2.5, horizontal: 1 },
+            { vertical: 2.5, horizontal: 9 },
+            { vertical: 5, horizontal: 6.5 },
+            { vertical: 2.5, horizontal: 3.5 },
+            { vertical: 2.5, horizontal: 6.5 },
+            { vertical: 7, horizontal: 2 },
+            { vertical: 5, horizontal: 3.5 },
+            { vertical: 9, horizontal: 5 },
+            { vertical: 7, horizontal: 5 },
+            { vertical: 7, horizontal: 8 }
+          ]
+        }
+      ],
+      players: [
+        { playerId: 1, name: 'GK Player', position: 'GK', isFirstEleven: true },
+        { playerId: 2, name: 'DR Player', position: 'DR', isFirstEleven: true },
+        { playerId: 3, name: 'DL Player', position: 'DL', isFirstEleven: true },
+        { playerId: 4, name: 'MC1 Player', position: 'MC', isFirstEleven: true },
+        { playerId: 5, name: 'DC1 Player', position: 'DC', isFirstEleven: true },
+        { playerId: 6, name: 'DC2 Player', position: 'DC', isFirstEleven: true },
+        { playerId: 7, name: 'AMR Player', position: 'AMR', isFirstEleven: true },
+        { playerId: 8, name: 'DMC Player', position: 'DMC', isFirstEleven: true },
+        { playerId: 9, name: 'FW Player', position: 'FW', isFirstEleven: true },
+        { playerId: 10, name: 'AMC Player', position: 'AMC', isFirstEleven: true },
+        { playerId: 11, name: 'AML Player', position: 'AML', isFirstEleven: true }
+      ]
+    },
+    away: {
+      teamId: 200,
+      name: 'Argentina',
+      players: []
+    },
+    events: []
+  };
+
+  const timeline = parseSoccerTimeline(matchData);
+  const activePlayers = timeline.homeSegments[0].activePlayers;
+
+  // Active players should have extracted fieldX and fieldY from match JSON formations
+  assert.equal(activePlayers[0].fieldX, 0);
+  assert.equal(activePlayers[0].fieldY, 5);
+  assert.equal(activePlayers[1].fieldX, 2.5);
+  assert.equal(activePlayers[1].fieldY, 1);
+  assert.equal(activePlayers[8].fieldX, 9);
+  assert.equal(activePlayers[8].fieldY, 5);
+});
+
+test('computeSoccerDimensionalAnalysis correctly applies relative adjustment (ca and VCR)', () => {
+  const matchData = createRecreationMatchData2007644();
+  const timeline = parseSoccerTimeline(matchData);
+  // Pick segment 6 or segment 7 where Morata (subbed off) or subs are playing
+  const seg = timeline.homeSegments[0];
+
+  const analysisNone = computeSoccerDimensionalAnalysis(
+    matchData,
+    seg,
+    true,
+    { type: 'none', k: 1.0 },
+    'goals',
+    { type: 'maxRatio' },
+    { type: 'none' },
+    { type: 'none' }
+  );
+
+  const analysisByMinutes = computeSoccerDimensionalAnalysis(
+    matchData,
+    seg,
+    true,
+    { type: 'none', k: 1.0 },
+    'goals',
+    { type: 'maxRatio' },
+    { type: 'none' },
+    { type: 'byMinutes' }
+  );
+
+  assert.ok(analysisNone.ca);
+  assert.ok(analysisNone.VCR);
+  assert.ok(analysisByMinutes.ca);
+  assert.ok(analysisByMinutes.VCR);
+
+  // In none, all ca are 1.0
+  analysisNone.ca.forEach(c => assert.equal(c, 1.0));
+
+  // In byMinutes, ca should reflect duration / playerMinutes
+  // Players with different minutesPlayed in the match (e.g. Alvaro Morata who played 76 vs starters who played 120) have different ca
+  const morataIdx = seg.activePlayers.findIndex(p => p.name === 'Álvaro Morata');
+  const laporteIdx = seg.activePlayers.findIndex(p => p.name === 'Aymeric Laporte');
+  if (morataIdx !== -1 && laporteIdx !== -1) {
+    // Morata played 76 minutes while Laporte played 120 minutes
+    assert.notEqual(analysisByMinutes.ca[morataIdx], analysisByMinutes.ca[laporteIdx]);
+  }
 });

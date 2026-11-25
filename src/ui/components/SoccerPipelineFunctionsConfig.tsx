@@ -175,11 +175,7 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
   const getRelativeFormula = (cfg: SoccerRelativeAdjustmentConfig) => {
     switch (cfg.type) {
       case 'byMinutes':
-        return 'minutos / minutos_totales';
-      case 'byTouches':
-        return 'media_toques / toques';
-      case 'byMean':
-        return '1 / media_vc';
+        return 'dur_intervalo / minutos_jugados';
       case 'custom':
         return cfg.customExpr || '1';
       case 'none':
@@ -519,8 +515,6 @@ export const SoccerPipelineFunctionsConfig: React.FC<SoccerPipelineFunctionsConf
             >
               <option value="none">{t('soccer.affinity.relativeTypeNone')}</option>
               <option value="byMinutes">{t('soccer.affinity.relativeTypeMinutes')}</option>
-              <option value="byTouches">{t('soccer.affinity.relativeTypeTouches')}</option>
-              <option value="byMean">{t('soccer.affinity.relativeTypeMean')}</option>
               <option value="custom">{t('soccer.affinity.relativeTypeCustom') || 'Personalizada'}</option>
             </select>
 

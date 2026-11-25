@@ -169,8 +169,29 @@ function renderDimensionAffinityGraphSvg(matrix: number[][]): string {
 
 /**
  * Computes horizontal pitch coordinates for the 11 active players.
+ * Respects JSON formation coordinates when present, falling back to positional heuristics.
  */
 function layoutPitchPlayers(players: MatchPlayer[]) {
+  const hasJsonCoords = players.some(
+    p => typeof p.fieldX === 'number' && typeof p.fieldY === 'number'
+  );
+
+  if (hasJsonCoords) {
+    return players.map((p, idx) => {
+      if (typeof p.fieldX === 'number' && typeof p.fieldY === 'number') {
+        const x = Math.round(55 + (p.fieldX / 10) * 595);
+        const y = Math.round(45 + ((10 - p.fieldY) / 10) * 360);
+        return { id: idx, player: p, x, y };
+      }
+      return {
+        id: idx,
+        player: p,
+        x: Math.round(100 + ((idx * 50) % 500)),
+        y: Math.round(70 + ((idx * 45) % 310))
+      };
+    });
+  }
+
   const gkList = players.filter(p => (p.position || '').toUpperCase().includes('GK'));
   const defs = players.filter(p => {
     const pos = (p.position || '').toUpperCase();

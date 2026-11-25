@@ -360,13 +360,39 @@ export const SoccerPitchGraph: React.FC<SoccerPitchGraphProps> = ({
 };
 
 /**
- * Distributes players on a 720 x 450 football pitch horizontally respecting tactical positions.
- * Left side (X ~ 55): Goalkeeper & defense
- * Right side (X ~ 600): Attackers & forwards
- * Top (Y ~ 75): Left flank (DL, ML, FWL)
- * Bottom (Y ~ 375): Right flank (DR, MR, FWR)
+ * Distributes players on a 720 x 450 football pitch horizontally.
+ * Priority 1: Exact coordinates specified in the match JSON (`fieldX`, `fieldY` from `formationPositions`).
+ *   In WhoScored JSON:
+ *   - fieldX (vertical): 0 (GK / defending goal line) to 10 (attacking goal line / strikers).
+ *   - fieldY (horizontal): 1 (right flank) to 9 (left flank), with 5 being the pitch center axis.
+ *   Mapped to 720 x 450 SVG canvas:
+ *   - SVG X: 55 + (fieldX / 10) * 595 (from X ~ 55 to X ~ 650)
+ *   - SVG Y: 45 + ((10 - fieldY) / 10) * 360 (flank left at top Y ~ 81, right flank at bottom Y ~ 369)
+ * Priority 2: Tactical role and positional heuristics fallback if JSON coordinates are not present.
  */
-function layoutSoccerPitchNodesHorizontal(players: MatchPlayer[]): PitchNode[] {
+export function layoutSoccerPitchNodesHorizontal(players: MatchPlayer[]): PitchNode[] {
+  // If players have JSON coordinates (fieldX and fieldY), use them directly!
+  const hasJsonCoords = players.some(
+    p => typeof p.fieldX === 'number' && typeof p.fieldY === 'number'
+  );
+
+  if (hasJsonCoords) {
+    return players.map((p, idx) => {
+      if (typeof p.fieldX === 'number' && typeof p.fieldY === 'number') {
+        const x = Math.round(55 + (p.fieldX / 10) * 595);
+        const y = Math.round(45 + ((10 - p.fieldY) / 10) * 360);
+        return { id: idx, player: p, x, y };
+      }
+      // Individual fallback if a single player lacks coordinates
+      return {
+        id: idx,
+        player: p,
+        x: Math.round(100 + ((idx * 50) % 500)),
+        y: Math.round(70 + ((idx * 45) % 310))
+      };
+    });
+  }
+
   const gkList: MatchPlayer[] = [];
   const defs: MatchPlayer[] = [];
   const mids: MatchPlayer[] = [];

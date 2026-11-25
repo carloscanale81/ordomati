@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Network,
   Table,
@@ -8,6 +8,7 @@ import {
   X
 } from 'lucide-react';
 import { MatchPlayer, SoccerTimelineResult } from '../../logic/soccerAnalysis';
+import { invertMatrixDetailed } from '../../logic/affinity';
 import { useI18n } from '../i18n/I18nContext';
 import { SoccerPitchGraph } from './SoccerPitchGraph';
 import { AffinityStage } from './SoccerContextualAffinityPanel';
@@ -52,11 +53,23 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
   const teamName = isHome ? timeline.homeTeamName : timeline.awayTeamName;
   const crestUrl = isHome ? timeline.homeCrestUrl : timeline.awayCrestUrl;
 
-  // 4 horizontal stages ordered linearly:
+  // Compute inverse of cumulative contextual affinity (A^C_cum)^(-1) for stage 5
+  const invAC_cum = useMemo(() => {
+    if (!AC_cum || AC_cum.length === 0) return [];
+    try {
+      const { matrix } = invertMatrixDetailed(AC_cum);
+      return matrix;
+    } catch {
+      return Array.from({ length: AC_cum.length }, () => Array(AC_cum.length).fill(0));
+    }
+  }, [AC_cum]);
+
+  // 5 horizontal stages ordered linearly:
   // 0: Distancia (Pases acumulados)
   // 1: Afinidad (Propagación acumulada)
   // 2: Afinidad Autoinducida (Bloqueo acumulado)
   // 3: Afinidad Contextual (Sinergia acumulada) -> Vista inicial predeterminada (stageIndex = 3)
+  // 4: Inversa Contextual Acumulada ((A^C_cum)⁻¹) -> Para resolución inversa de VP
   const [stageIndex, setStageIndex] = useState<number>(3);
 
   const stages: {
@@ -99,10 +112,19 @@ export const SoccerIntegralAffinityPanel: React.FC<SoccerIntegralAffinityPanelPr
       key: 'contextual',
       label: isEs ? 'Afinidad Contextual Acumulada' : 'Cumulative Contextual Affinity',
       subtitle: isEs
-        ? 'Sinergia y modulación contextual ponderada'
-        : 'Weighted synergy & contextual modulation',
+        ? 'Sinergia acumulada y modulación de valor'
+        : 'Cumulative synergy & value modulation',
       matrix: AC_cum,
       precision: 2
+    },
+    {
+      key: 'inverse',
+      label: isEs ? 'Inversa Contextual Acumulada' : 'Cumulative Inverse Contextual',
+      subtitle: isEs
+        ? 'Matriz inversa (A^C)⁻¹ para resolución de V^P'
+        : 'Inverse matrix (A^C)⁻¹ for V^P resolution',
+      matrix: invAC_cum,
+      precision: 3
     }
   ];
 

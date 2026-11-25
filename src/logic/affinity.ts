@@ -21,6 +21,7 @@ export interface RelativeAdjustmentOptions {
   populationVC?: number[];
   duration?: number;
   totalDuration?: number;
+  playerMinutes?: number[];
   touches?: number[];
   meanVC?: number;
   extraScope?: Record<string, number>;
@@ -668,9 +669,17 @@ export const computeRelativeAdjustment = (
     }
   } else if (type === 'byMinutes') {
     const dur = options?.duration ?? 90;
-    const total = options?.totalDuration ?? 90;
-    const factor = total > 0 ? dur / total : 1.0;
-    for (let i = 0; i < n; i++) ca[i] = factor;
+    const playerMins = options?.playerMinutes;
+    if (playerMins && playerMins.length === n) {
+      for (let i = 0; i < n; i++) {
+        const pm = playerMins[i];
+        ca[i] = pm > 0 ? dur / pm : 1.0;
+      }
+    } else {
+      const total = options?.totalDuration ?? 90;
+      const factor = total > 0 ? dur / total : 1.0;
+      for (let i = 0; i < n; i++) ca[i] = factor;
+    }
   } else if (type === 'byTouches') {
     const touches = options?.touches || Array(n).fill(1);
     const avgTouches = touches.reduce((a, b) => a + b, 0) / (n || 1);

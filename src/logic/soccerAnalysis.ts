@@ -28,7 +28,7 @@ export type SoccerPropagationConfig = PropagationConfig;
 export type SoccerBlockingType = BlockingConfig['type'];
 export type SoccerBlockingConfig = BlockingConfig;
 
-export type SoccerRelativeAdjustmentType = 'none' | 'byMinutes' | 'byTouches' | 'byMean' | 'custom';
+export type SoccerRelativeAdjustmentType = 'none' | 'byMinutes' | 'custom';
 export type SoccerRelativeAdjustmentConfig = RelativeAdjustmentConfig;
 
 export type SoccerEqualizationType = EqualizationConfig['type'];
@@ -47,6 +47,8 @@ export interface MatchPlayer {
   shirtNo: number;
   isFirstEleven: boolean;
   team: 'home' | 'away';
+  fieldX?: number; // Coordinates from match JSON formationPositions (vertical/distance: 0 = GK, 10 = Striker)
+  fieldY?: number; // Coordinates from match JSON formationPositions (horizontal/width: 1 = Right, 9 = Left)
 }
 
 export interface MatchSubstitution {
@@ -56,6 +58,7 @@ export interface MatchSubstitution {
   team: 'home' | 'away';
   position?: string;
   shirtNo?: number;
+  playerId?: number;
 }
 
 export type TimelineEventType = 'sub' | 'goal' | 'red_card';
@@ -194,13 +197,11 @@ export type SoccerConcept =
   | 'aerial'
   | 'shotsOnTarget'
   | 'touches'
-  | 'passAccuracy'
   | 'accuratePasses'
   | 'keyPasses'
   | 'tacklesSuccessful'
   | 'clearances'
   | 'interceptions'
-  | 'cornerAccuracy'
   | 'dribbles'
   | 'shots';
 
@@ -235,6 +236,8 @@ export interface SoccerDimensionalAnalysis {
   AAI: number[][]; // Autoinduced affinity matrix (after blocking)
   AC: number[][]; // Contextual affinity matrix (after synergy)
   VC: number[];   // Contextual value vector (11x1)
+  ca?: number[];  // Relative adjustment coefficient vector (11x1)
+  VCR?: number[]; // Adjusted contextual value vector (11x1) = VC .* ca
   VP: number[] | null; // Own value vector (11x1) solved via (AC)^-1 * VCR
   synergyConfig: SynergyConfig;
   propagationConfig?: SoccerPropagationConfig;
@@ -422,25 +425,35 @@ export const parseSoccerTimeline = (matchData: any): SoccerTimelineResult => {
 
   const homeStarting: MatchPlayer[] = (matchData?.home?.players || [])
     .filter((p: any) => p.isFirstEleven)
-    .map((p: any) => ({
-      id: p.playerId || p.id,
-      name: p.name,
-      position: p.position || 'MF',
-      shirtNo: p.shirtNo || 0,
-      isFirstEleven: true,
-      team: 'home' as const
-    }));
+    .map((p: any) => {
+      const coords = resolvePlayerFormationCoords({ id: p.playerId || p.id, name: p.name, team: 'home' }, matchData, 0);
+      return {
+        id: p.playerId || p.id,
+        name: p.name,
+        position: p.position || 'MF',
+        shirtNo: p.shirtNo || 0,
+        isFirstEleven: true,
+        team: 'home' as const,
+        fieldX: coords?.fieldX,
+        fieldY: coords?.fieldY
+      };
+    });
 
   const awayStarting: MatchPlayer[] = (matchData?.away?.players || [])
     .filter((p: any) => p.isFirstEleven)
-    .map((p: any) => ({
-      id: p.playerId || p.id,
-      name: p.name,
-      position: p.position || 'MF',
-      shirtNo: p.shirtNo || 0,
-      isFirstEleven: true,
-      team: 'away' as const
-    }));
+    .map((p: any) => {
+      const coords = resolvePlayerFormationCoords({ id: p.playerId || p.id, name: p.name, team: 'away' }, matchData, 0);
+      return {
+        id: p.playerId || p.id,
+        name: p.name,
+        position: p.position || 'MF',
+        shirtNo: p.shirtNo || 0,
+        isFirstEleven: true,
+        team: 'away' as const,
+        fieldX: coords?.fieldX,
+        fieldY: coords?.fieldY
+      };
+    });
 
   const homeSegments = buildTeamSegments(
     'home',
@@ -448,7 +461,8 @@ export const parseSoccerTimeline = (matchData: any): SoccerTimelineResult => {
     homeStarting,
     homeSubs,
     homeEvents,
-    totalMinutes
+    totalMinutes,
+    matchData
   );
 
   const awaySegments = buildTeamSegments(
@@ -457,7 +471,8 @@ export const parseSoccerTimeline = (matchData: any): SoccerTimelineResult => {
     awayStarting,
     awaySubs,
     awayEvents,
-    totalMinutes
+    totalMinutes,
+    matchData
   );
 
   return {
@@ -574,6 +589,7 @@ function extractSubsFromEvents(
 
       let shirtNo = resolvedOn?.shirtNo || (ev.subPlayerId && playerDict[ev.subPlayerId]?.shirtNo) || ev.shirtNo;
       let position = resolvedOn?.position || (ev.subPlayerId && playerDict[ev.subPlayerId]?.position) || ev.position;
+      let subPlayerId = resolvedOn?.id || (ev.subPlayerId ? Number(ev.subPlayerId) : undefined);
 
       // Prevent "Entra" by falling back to unused bench players from the team roster
       if (!onName || onName.toLowerCase() === 'entra' || onName.toLowerCase() === 'jugador entra') {
@@ -584,6 +600,7 @@ function extractSubsFromEvents(
           onName = unusedBench.name;
           shirtNo = unusedBench.shirtNo;
           position = unusedBench.position;
+          subPlayerId = unusedBench.playerId || unusedBench.id;
         } else {
           onName = 'Jugador Entra';
         }
@@ -597,6 +614,7 @@ function extractSubsFromEvents(
           playerOn: onName,
           shirtNo,
           position,
+          playerId: subPlayerId,
           team: teamKey
         });
       }
@@ -721,13 +739,58 @@ function extractTeamEvents(
   return teamEvents.sort((a, b) => a.minute - b.minute);
 }
 
+/**
+ * Resolves tactical pitch coordinates for a player from matchData JSON formations.
+ * In WhoScored matchCentreData:
+ * - `vertical` spans 0 to 10 (0 = Goalkeeper / goal line, 10 = Opponent goal line / striker)
+ * - `horizontal` spans 0 to 10 (0/1 = Right wing, 5 = Center, 9/10 = Left wing)
+ */
+export function resolvePlayerFormationCoords(
+  player: { id?: number; name?: string; team?: 'home' | 'away' },
+  matchData: any,
+  minute: number = 0
+): { fieldX: number; fieldY: number } | null {
+  if (!player || !matchData) return null;
+  const teamKey = player.team || 'home';
+  const teamObj = teamKey === 'away' ? matchData.away : matchData.home;
+  const fList = teamObj?.formations;
+  if (!Array.isArray(fList) || fList.length === 0) return null;
+
+  const activeFormation =
+    fList.find(fm =>
+      typeof fm.startMinuteExpanded === 'number' && typeof fm.endMinuteExpanded === 'number'
+        ? fm.startMinuteExpanded <= minute && minute <= fm.endMinuteExpanded
+        : true
+    ) || fList[0];
+
+  if (
+    activeFormation &&
+    Array.isArray(activeFormation.playerIds) &&
+    Array.isArray(activeFormation.formationPositions)
+  ) {
+    const slotIdx = activeFormation.playerIds.findIndex(
+      (pid: number) =>
+        pid === player.id ||
+        (matchData.playerIdNameDictionary && matchData.playerIdNameDictionary[pid] === player.name)
+    );
+    if (slotIdx !== -1 && slotIdx < activeFormation.formationPositions.length) {
+      const pos = activeFormation.formationPositions[slotIdx];
+      if (pos && typeof pos.vertical === 'number' && typeof pos.horizontal === 'number') {
+        return { fieldX: pos.vertical, fieldY: pos.horizontal };
+      }
+    }
+  }
+  return null;
+}
+
 function buildTeamSegments(
   teamKey: 'home' | 'away',
   teamName: string,
   startingXI: MatchPlayer[],
   subs: MatchSubstitution[],
   teamEvents: TimelineEventReason[],
-  totalMinutes: number
+  totalMinutes: number,
+  matchData?: any
 ): TimelineSegment[] {
   const periodBounds = getPeriodBoundaries(totalMinutes);
   const eventMinutes = teamEvents.map(s => s.minute).filter(m => m > 0 && m < totalMinutes);
@@ -756,7 +819,7 @@ function buildTeamSegments(
         currentActive = currentActive.map(player => {
           if (player.name === sub.playerOff) {
             return {
-              id: sub.shirtNo ? sub.shirtNo * 10 : player.id + 1000,
+              id: sub.playerId ? sub.playerId : (sub.shirtNo ? sub.shirtNo * 10 : player.id + 1000),
               name: sub.playerOn,
               position: sub.position || player.position,
               shirtNo: sub.shirtNo || player.shirtNo,
@@ -791,6 +854,15 @@ function buildTeamSegments(
       label += ` (${endReason.description})`;
     }
 
+    // Augment active players with their formation coordinates from matchData at this segment's startMinute
+    const activeWithCoords = currentActive.map(p => {
+      const coords = resolvePlayerFormationCoords(p, matchData, startMinute);
+      if (coords) {
+        return { ...p, fieldX: coords.fieldX, fieldY: coords.fieldY };
+      }
+      return p;
+    });
+
     segments.push({
       id: `${teamKey}-seg-${startMinute}-${endMinute}`,
       team: teamKey,
@@ -810,7 +882,7 @@ function buildTeamSegments(
       startReason,
       endReason,
       events: segmentEvents,
-      activePlayers: [...currentActive]
+      activePlayers: activeWithCoords
     });
   }
 
@@ -1128,9 +1200,6 @@ export const computeSoccerDimensionalAnalysis = (
       deriveTacticalTouches(VC, players, segment.duration);
       totalMetric = VC.reduce((a, b) => a + b, 0);
     }
-  } else if (concept === 'passAccuracy') {
-    deriveTacticalPassAccuracy(VC, players, passCounts);
-    totalMetric = VC.reduce((a, b) => a + b, 0);
   } else if (concept === 'accuratePasses') {
     for (let i = 0; i < n; i++) {
       let pAcc = 0;
@@ -1208,27 +1277,6 @@ export const computeSoccerDimensionalAnalysis = (
       deriveTacticalInterceptions(VC, players, segment.duration);
       totalMetric = VC.reduce((a, b) => a + b, 0);
     }
-  } else if (concept === 'cornerAccuracy') {
-    events.forEach(ev => {
-      if (ev.minute >= segment.startMinute && ev.minute <= segment.endMinute) {
-        const isCorner =
-          ev.type === 'Corner' ||
-          ev.type?.displayName === 'Corner' ||
-          ev.type?.value === 6 ||
-          (Array.isArray(ev.qualifiers) && ev.qualifiers.some((q: any) => q.type?.value === 6 || q.type?.displayName === 'CornerTaken'));
-        if (isCorner) {
-          const pIdx = findSegmentPlayerIndex(ev, players, matchData);
-          if (pIdx !== -1) {
-            VC[pIdx] += 1;
-            totalMetric += 1;
-          }
-        }
-      }
-    });
-    if (totalMetric === 0) {
-      deriveTacticalCornerAccuracy(VC, players, segment.duration);
-      totalMetric = VC.reduce((a, b) => a + b, 0);
-    }
   }
 
   // 7. Relative Adjustment via unified Relative Adjustment Function:
@@ -1237,10 +1285,25 @@ export const computeSoccerDimensionalAnalysis = (
     for (let j = 0; j < n; j++) tCount += passCounts[i][j] + passCounts[j][i];
     return tCount;
   });
+  // Calculate total minutes played across the match for each player in this segment
+  const playerMinutes = players.map(p => {
+    const rawList = p.team === 'home' ? matchData?.home?.players : matchData?.away?.players;
+    const rawP = Array.isArray(rawList)
+      ? rawList.find((rp: any) => (rp.playerId && rp.playerId === p.id) || rp.id === p.id || rp.name === p.name)
+      : null;
+    const played = rawP?.minutesPlayed !== undefined && Number(rawP.minutesPlayed) > 0
+      ? Number(rawP.minutesPlayed)
+      : (p.isFirstEleven ? 90 : segment.duration);
+    return played;
+  });
+  const hasExtraTime = checkMatchHasExtraTime(matchData);
+  const totalMatchDuration = hasExtraTime ? 120 : 90;
+
   const { ca, VCR } = computeRelativeAdjustment(VC, {
     ...relativeConfig,
     duration: segment.duration,
-    totalDuration: 90,
+    totalDuration: totalMatchDuration,
+    playerMinutes,
     touches: playerTouches
   });
 
@@ -1262,6 +1325,8 @@ export const computeSoccerDimensionalAnalysis = (
     AAI,
     AC,
     VC,
+    ca,
+    VCR,
     VP,
     synergyConfig,
     propagationConfig,
@@ -1371,24 +1436,6 @@ function deriveTacticalTouches(VC: number[], players: MatchPlayer[], duration: n
   });
 }
 
-function deriveTacticalPassAccuracy(VC: number[], players: MatchPlayer[], passCounts: number[][]) {
-  const n = players.length;
-  for (let i = 0; i < n; i++) {
-    const p = players[i];
-    let rowPasses = 0;
-    for (let j = 0; j < n; j++) {
-      rowPasses += passCounts[i][j];
-    }
-    if (rowPasses > 0) {
-      // Scale accuracy 85% to 96% based on midfield/defense
-      const base = p.position.startsWith('D') || p.position === 'DC' ? 93 : p.name === 'Rodri' ? 95 : 88;
-      VC[i] = base;
-    } else {
-      VC[i] = p.name === 'Rodri' ? 94 : 88;
-    }
-  }
-}
-
 function deriveTacticalAccuratePasses(VC: number[], players: MatchPlayer[], duration: number) {
   const factor = Math.max(1, duration / 30);
   players.forEach((p, idx) => {
@@ -1439,15 +1486,6 @@ function deriveTacticalInterceptions(VC: number[], players: MatchPlayer[], durat
     if (p.name === 'Marc Cucurella' || p.name === 'Dani Carvajal' || p.name === 'Cristian Romero') VC[idx] = Math.round(2.5 * factor);
     else if (p.name === 'Rodri' || p.name === 'Nicolás Tagliafico' || p.name === 'Enzo Fernández') VC[idx] = Math.round(2 * factor);
     else if (p.position.startsWith('D') || p.position.startsWith('M')) VC[idx] = Math.round(1 * factor);
-    else VC[idx] = 0;
-  });
-}
-
-function deriveTacticalCornerAccuracy(VC: number[], players: MatchPlayer[], duration: number) {
-  players.forEach((p, idx) => {
-    if (p.name === 'Lamine Yamal' || p.name === 'Lionel Messi') VC[idx] = 85;
-    else if (p.name === 'Dani Olmo' || p.name === 'Rodrigo De Paul') VC[idx] = 78;
-    else if (p.name === 'Nico Williams') VC[idx] = 72;
     else VC[idx] = 0;
   });
 }
@@ -1644,9 +1682,17 @@ export const extractPlayerStats = (
   const rawStats = rawP?.stats || {};
   const events: any[] = Array.isArray(matchData?.events) ? matchData.events : [];
 
+  const teamId = player.team === 'home' ? matchData?.home?.teamId : matchData?.away?.teamId;
+  const teamName = player.team === 'home' ? matchData?.home?.name : matchData?.away?.name;
+
   const playerEvents = events.filter(ev => {
     const min = Number(ev.minute || 0);
     if (min < startMin || min > endMin) return false;
+
+    // Ensure event belongs to the player's team if event has team / teamId information
+    if (teamId && ev.teamId && ev.teamId !== teamId) return false;
+    if (teamName && ev.team && ev.team !== teamName && ev.team !== player.team) return false;
+
     if (ev.playerId && player.id && Number(ev.playerId) === Number(player.id)) return true;
     const evName = (ev.player || ev.playerName || '').toLowerCase();
     const pName = (player.name || '').toLowerCase();
@@ -1847,7 +1893,12 @@ export const computeIntegralMatchCumulativeScores = (
   propagationConfig: SoccerPropagationConfig = { type: 'maxRatio' },
   blockingConfig: SoccerBlockingConfig = { type: 'none' },
   relativeConfig: SoccerRelativeAdjustmentConfig = { type: 'none' },
-  equalizationConfig: SoccerEqualizationConfig = { type: 'max' }
+  equalizationConfig: SoccerEqualizationConfig | SoccerEqualizationConfig[] = { type: 'max' },
+  synergyConfig?: SynergyConfig,
+  propagationConfigs?: Record<SoccerConcept, SoccerPropagationConfig>,
+  blockingConfigs?: Record<SoccerConcept, SoccerBlockingConfig>,
+  relativeConfigs?: Record<SoccerConcept, SoccerRelativeAdjustmentConfig>,
+  equalizationConfigs?: Record<SoccerConcept, SoccerEqualizationConfig>
 ): IntegralMatchAnalysisResult => {
   const totalMinutes = timeline.totalMinutes;
   const clampedMinute = Math.min(Math.max(0, currentMinute), totalMinutes);
@@ -1855,10 +1906,10 @@ export const computeIntegralMatchCumulativeScores = (
   // Helper to collect all participating players (starters + substitutes)
   const getParticipatingPlayers = (team: 'home' | 'away'): MatchPlayer[] => {
     const segments = team === 'home' ? timeline.homeSegments : timeline.awaySegments;
-    const playerMap = new Map<number | string, MatchPlayer>();
+    const playerMap = new Map<string, MatchPlayer>();
     segments.forEach(seg => {
       seg.activePlayers.forEach(p => {
-        const key = p.id || p.name;
+        const key = `${p.team}_${p.id || p.name}`;
         if (!playerMap.has(key)) {
           playerMap.set(key, p);
         }
@@ -1870,17 +1921,17 @@ export const computeIntegralMatchCumulativeScores = (
   const homeAllPlayers = getParticipatingPlayers('home');
   const awayAllPlayers = getParticipatingPlayers('away');
 
-  const homeCumulative = new Map<number | string, number>();
-  const awayCumulative = new Map<number | string, number>();
-  homeAllPlayers.forEach(p => homeCumulative.set(p.id || p.name, 0));
-  awayAllPlayers.forEach(p => awayCumulative.set(p.id || p.name, 0));
+  const homeCumulative = new Map<string, number>();
+  const awayCumulative = new Map<string, number>();
+  homeAllPlayers.forEach(p => homeCumulative.set(`${p.team}_${p.id || p.name}`, 0));
+  awayAllPlayers.forEach(p => awayCumulative.set(`${p.team}_${p.id || p.name}`, 0));
 
-  const playerSegmentMap = new Map<number | string, PlayerSegmentBreakdown[]>();
-  const playerDimCumMap = new Map<number | string, Map<SoccerConcept, { rawTotalVC: number; cumulativeVp: number }>>();
+  const playerSegmentMap = new Map<string, PlayerSegmentBreakdown[]>();
+  const playerDimCumMap = new Map<string, Map<SoccerConcept, { rawTotalVC: number; cumulativeVp: number }>>();
 
   const initPlayerData = (allPlayers: MatchPlayer[]) => {
     allPlayers.forEach(p => {
-      const key = p.id || p.name;
+      const key = `${p.team}_${p.id || p.name}`;
       playerSegmentMap.set(key, []);
       const dimMap = new Map<SoccerConcept, { rawTotalVC: number; cumulativeVp: number }>();
       SOCCER_CONCEPTS.forEach(cfg => {
@@ -1896,7 +1947,7 @@ export const computeIntegralMatchCumulativeScores = (
   const accumulateTeamScores = (
     team: 'home' | 'away',
     segments: TimelineSegment[],
-    cumulativeMap: Map<number | string, number>,
+    cumulativeMap: Map<string, number>,
     allTeamPlayers: MatchPlayer[]
   ) => {
     segments.forEach(seg => {
@@ -1905,30 +1956,44 @@ export const computeIntegralMatchCumulativeScores = (
       const weight = effectiveDuration / totalMinutes;
       const fullSegWeight = seg.duration / totalMinutes;
 
-      // Always compute all 12 dimensional analyses and aggregation for this segment so we have the complete breakdown
-      const dimAnalyses = SOCCER_CONCEPTS.map(cfg =>
-        computeSoccerDimensionalAnalysis(
+      // Always compute all 10 dimensional analyses and aggregation for this segment so we have the complete breakdown
+      const dimAnalyses = SOCCER_CONCEPTS.map(cfg => {
+        const synCfg =
+          (synergyConfigs && synergyConfigs[cfg.key] && synergyConfigs[cfg.key].type !== 'none')
+            ? synergyConfigs[cfg.key]
+            : (synergyConfig || synergyConfigs?.[cfg.key] || { type: 'none', k: 1.0 });
+
+        const propCfg = (propagationConfigs && propagationConfigs[cfg.key]) || propagationConfig;
+        const blockCfg = (blockingConfigs && blockingConfigs[cfg.key]) || blockingConfig;
+        const relCfg = (relativeConfigs && relativeConfigs[cfg.key]) || relativeConfig;
+
+        return computeSoccerDimensionalAnalysis(
           matchData,
           seg,
           true,
-          (synergyConfigs && synergyConfigs[cfg.key]) || { type: 'none', k: 1.0 },
+          synCfg,
           cfg.key,
-          propagationConfig,
-          blockingConfig,
-          relativeConfig
-        )
-      );
+          propCfg,
+          blockCfg,
+          relCfg
+        );
+      });
+
+      const effectiveEqConfig = equalizationConfigs
+        ? SOCCER_CONCEPTS.map(c => equalizationConfigs[c.key] || (Array.isArray(equalizationConfig) ? equalizationConfig[0] : equalizationConfig))
+        : equalizationConfig;
+
       const agg = computeSoccerAggregatedAnalysis(
         dimAnalyses,
         seg,
         owaConfig,
         dimAffinityMatrix,
-        equalizationConfig
+        effectiveEqConfig
       );
 
       // Record segment breakdown for each participating player
       allTeamPlayers.forEach(p => {
-        const key = p.id || p.name;
+        const key = `${p.team}_${p.id || p.name}`;
         const pIdx = seg.activePlayers.findIndex(ap => (ap.id && ap.id === p.id) || ap.name === p.name);
         const isActive = pIdx !== -1;
         const segScore = isActive ? (agg.scores[pIdx] || 0) : 0;
@@ -1982,7 +2047,7 @@ export const computeIntegralMatchCumulativeScores = (
         if (selectedConceptOrAgg === 'aggregate') {
           agg.players.forEach((p, idx) => {
             const score = agg.scores[idx] || 0;
-            const key = p.id || p.name;
+            const key = `${p.team}_${p.id || p.name}`;
             const current = cumulativeMap.get(key) || 0;
             cumulativeMap.set(key, current + score * weight);
           });
@@ -1991,7 +2056,7 @@ export const computeIntegralMatchCumulativeScores = (
           const dim = dimIdx !== -1 ? dimAnalyses[dimIdx] : dimAnalyses[0];
           dim.players.forEach((p, idx) => {
             const score = dim.VP ? Math.max(0, dim.VP[idx]) : dim.VC[idx] || 0;
-            const key = p.id || p.name;
+            const key = `${p.team}_${p.id || p.name}`;
             const current = cumulativeMap.get(key) || 0;
             cumulativeMap.set(key, current + score * weight);
           });
@@ -2007,9 +2072,9 @@ export const computeIntegralMatchCumulativeScores = (
     p: MatchPlayer,
     team: 'home' | 'away',
     teamName: string,
-    cumulativeMap: Map<number | string, number>
+    cumulativeMap: Map<string, number>
   ): IntegralMatchPlayerScore => {
-    const key = p.id || p.name;
+    const key = `${p.team}_${p.id || p.name}`;
     const fullStats = extractPlayerStats(matchData, p);
     const segs = team === 'home' ? timeline.homeSegments : timeline.awaySegments;
     const minutesPlayed = segs

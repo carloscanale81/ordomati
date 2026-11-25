@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Table,
   Network,
@@ -9,10 +9,11 @@ import {
   MatchPlayer,
   TimelineSegment
 } from '../../logic/soccerAnalysis';
+import { invertMatrixDetailed } from '../../logic/affinity';
 import { useI18n } from '../i18n/I18nContext';
 import { SoccerPitchGraph } from './SoccerPitchGraph';
 
-export type AffinityStage = 'distance' | 'propagation' | 'blocking' | 'contextual';
+export type AffinityStage = 'distance' | 'propagation' | 'blocking' | 'contextual' | 'inverse';
 
 export interface SoccerContextualAffinityPanelProps {
   segment: TimelineSegment;
@@ -41,11 +42,23 @@ export const SoccerContextualAffinityPanel: React.FC<SoccerContextualAffinityPan
   const isEs = language === 'es';
   const [viewMode, setViewMode] = useState<'matrix' | 'graph'>('graph');
 
-  // 4 horizontal stages ordered linearly:
+  // Compute inverse of contextual affinity (A^C)^(-1) for the 5th stage
+  const invAC = useMemo(() => {
+    if (!AC || AC.length === 0) return [];
+    try {
+      const { matrix } = invertMatrixDetailed(AC);
+      return matrix;
+    } catch {
+      return Array.from({ length: AC.length }, () => Array(AC.length).fill(0));
+    }
+  }, [AC]);
+
+  // 5 horizontal stages ordered linearly:
   // 0: Distancia (Pases base)
   // 1: Afinidad (Propagación)
   // 2: Afinidad Autoinducida (Bloqueo)
   // 3: Afinidad Contextual (Sinergia) -> Vista inicial predeterminada
+  // 4: Inversa Contextual ((A^C)^(-1)) -> Para el cálculo inverso de VP
   const [stageIndex, setStageIndex] = useState<number>(3);
 
   const stages: {
@@ -92,6 +105,15 @@ export const SoccerContextualAffinityPanel: React.FC<SoccerContextualAffinityPan
         : 'Synergy & contextual modulation',
       matrix: AC,
       precision: 2
+    },
+    {
+      key: 'inverse',
+      label: isEs ? 'Inversa Contextual' : 'Inverse Contextual',
+      subtitle: isEs
+        ? 'Matriz inversa (A^C)⁻¹ para resolución de V^P'
+        : 'Inverse matrix (A^C)⁻¹ for V^P resolution',
+      matrix: invAC,
+      precision: 3
     }
   ];
 

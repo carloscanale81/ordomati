@@ -72,10 +72,11 @@ export const SoccerDimensionCard: React.FC<SoccerDimensionCardProps> = ({
     { key: 'equalization', label: isEs ? 'Equiparación' : 'Equalization' }
   ];
 
-  const { players, VC, VP, isCalculated } = analysis;
+  const { players, VC, ca, VCR, VP, isCalculated } = analysis;
 
   const maxVp = VP && VP.length > 0 ? Math.max(...VP, 0.0001) : 1;
   const maxVc = VC && VC.length > 0 ? Math.max(...VC, 1) : 1;
+  const hasRelativeAdjustment = analysis.relativeConfig && analysis.relativeConfig.type !== 'none';
 
   // Identify MVP player for this dimension (only if positive value exists)
   let topVpIdx = -1;
@@ -316,18 +317,27 @@ export const SoccerDimensionCard: React.FC<SoccerDimensionCardProps> = ({
             )}
           </div>
 
-          {/* Pillar 2: Valor Contextual (V^C) */}
+          {/* Pillar 2: Valor Contextual (V^C / V^CR) */}
           <div className="flex flex-col h-full rounded-xl p-3.5 bg-gray-50/70 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800">
-            <div className="flex items-center gap-1.5 pb-2 mb-2 border-b border-gray-200 dark:border-gray-800">
-              <Sliders className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <h4 className="text-xs font-bold text-gray-900 dark:text-gray-100">
-                {t('soccer.dimension.vcTitle')} ({conceptTitle})
-              </h4>
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center gap-1.5">
+                <Sliders className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h4 className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                  {hasRelativeAdjustment ? `${t('soccer.dimension.vcTitle')} / V^CR` : t('soccer.dimension.vcTitle')} ({conceptTitle})
+                </h4>
+              </div>
+              {hasRelativeAdjustment && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-semibold">
+                  c_a activo
+                </span>
+              )}
             </div>
 
             <div className="flex-1 space-y-1 overflow-y-auto max-h-[520px] pr-0.5">
               {players.map((p, idx) => {
                 const val = VC[idx] ?? 0;
+                const coeff = ca && ca[idx] !== undefined ? ca[idx] : 1.0;
+                const adjVal = VCR && VCR[idx] !== undefined ? VCR[idx] : val * coeff;
                 const barWidth = Math.max(3, Math.round((val / maxVc) * 100));
 
                 return (
@@ -351,9 +361,14 @@ export const SoccerDimensionCard: React.FC<SoccerDimensionCardProps> = ({
                           className="h-full bg-emerald-500 rounded-full"
                         />
                       </div>
-                      <span className="font-mono font-bold text-[11px] text-right w-6 text-emerald-600 dark:text-emerald-400">
+                      <span className="font-mono font-bold text-[11px] text-right w-6 text-emerald-600 dark:text-emerald-400" title={`V^C original: ${val}`}>
                         {val}
                       </span>
+                      {hasRelativeAdjustment && (
+                        <span className="font-mono text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold w-16 text-right" title={`c_a: ${coeff.toFixed(2)} → V^CR: ${adjVal.toFixed(2)}`}>
+                          [×{coeff.toFixed(2)}]
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
