@@ -40,9 +40,15 @@ export interface SoccerFlavourModelConfig {
   relativeConfig?: any;
   equalizationConfig?: any;
   dimensionOverrides?: Record<string, any>;
+  propagationConfigs?: Record<string, any>;
+  blockingConfigs?: Record<string, any>;
+  synergyConfigs?: Record<string, any>;
+  relativeConfigs?: Record<string, any>;
+  equalizationConfigs?: Record<string, any>;
   owaConfig?: any;
   dimAffinityMatrix?: number[][];
   activeDimensions?: SoccerConcept[];
+  soccerAnalysisCalculated?: boolean;
 }
 
 /**

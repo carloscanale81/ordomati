@@ -525,6 +525,93 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     }
   };
 
+  /**
+   * Restores the complete Soccer Ordoexperto model configuration from an imported case,
+   * resetting any missing fields to clean defaults so no stale state leaks across imports.
+   */
+  const applySoccerModelConfig = React.useCallback((smc?: FlavourAnalysisCase['soccerModelConfig']) => {
+    setActiveSoccerTab(smc?.activeSoccerTab === 'integral' ? 'integral' : 'segments');
+    setSelectedSegmentId(typeof smc?.selectedSegmentId === 'string' ? smc.selectedSegmentId : '');
+    setSoccerAnalysisCalculated(
+      typeof smc?.soccerAnalysisCalculated === 'boolean' ? smc.soccerAnalysisCalculated : true
+    );
+
+    setSoccerPropagationConfig(smc?.propagationConfig || { type: 'maxRatio' });
+    setSoccerBlockingConfig(smc?.blockingConfig || { type: 'none' });
+    setSoccerSynergyConfig(smc?.synergyConfig || { type: 'none', k: 1.0 });
+    setSoccerRelativeConfig(smc?.relativeConfig || { type: 'none' });
+    setSoccerEqualizationConfig(smc?.equalizationConfig || { type: 'max' });
+
+    const nextOverrides: Record<SoccerConcept, Record<PipelineFunctionKey, boolean>> = {} as any;
+    const nextPropConfigs: Record<SoccerConcept, SoccerPropagationConfig> = {} as any;
+    const nextBlockConfigs: Record<SoccerConcept, SoccerBlockingConfig> = {} as any;
+    const nextSynConfigs: Record<SoccerConcept, SynergyConfig> = {} as any;
+    const nextRelConfigs: Record<SoccerConcept, SoccerRelativeAdjustmentConfig> = {} as any;
+    const nextEqConfigs: Record<SoccerConcept, SoccerEqualizationConfig> = {} as any;
+
+    SOCCER_CONCEPTS.forEach(c => {
+      const ov = smc?.dimensionOverrides?.[c.key];
+      nextOverrides[c.key] = {
+        propagation: Boolean(ov?.propagation),
+        blocking: Boolean(ov?.blocking),
+        synergy: Boolean(ov?.synergy),
+        relative: Boolean(ov?.relative),
+        equalization: Boolean(ov?.equalization)
+      };
+      nextPropConfigs[c.key] = smc?.propagationConfigs?.[c.key] || { type: 'maxRatio' };
+      nextBlockConfigs[c.key] = smc?.blockingConfigs?.[c.key] || { type: 'none' };
+      nextSynConfigs[c.key] = smc?.synergyConfigs?.[c.key] || { type: 'none', k: 1.0 };
+      nextRelConfigs[c.key] = smc?.relativeConfigs?.[c.key] || { type: 'none' };
+      nextEqConfigs[c.key] = smc?.equalizationConfigs?.[c.key] || { type: 'max' };
+    });
+
+    setDimensionOverrides(nextOverrides);
+    setSoccerPropagationConfigs(nextPropConfigs);
+    setSoccerBlockingConfigs(nextBlockConfigs);
+    setSoccerSynergyConfigs(nextSynConfigs);
+    setSoccerRelativeConfigs(nextRelConfigs);
+    setSoccerEqualizationConfigs(nextEqConfigs);
+
+    if (smc?.owaConfig && typeof smc.owaConfig === 'object') {
+      const owaType = smc.owaConfig.type && SOCCER_OWA_PRESETS[smc.owaConfig.type as keyof typeof SOCCER_OWA_PRESETS]
+        ? smc.owaConfig.type
+        : 'average';
+      const weights = Array.isArray(smc.owaConfig.weights) && smc.owaConfig.weights.length === SOCCER_CONCEPTS.length
+        ? smc.owaConfig.weights.map((w: any) => (typeof w === 'number' && Number.isFinite(w) ? w : 0))
+        : [...SOCCER_OWA_PRESETS[owaType as keyof typeof SOCCER_OWA_PRESETS]];
+      setSoccerOwaConfig({ type: owaType, weights });
+    } else {
+      setSoccerOwaConfig({ type: 'average', weights: [...SOCCER_OWA_PRESETS.average] });
+    }
+
+    if (
+      Array.isArray(smc?.dimAffinityMatrix) &&
+      smc.dimAffinityMatrix.length === SOCCER_CONCEPTS.length &&
+      smc.dimAffinityMatrix.every(r => Array.isArray(r) && r.length === SOCCER_CONCEPTS.length)
+    ) {
+      setSoccerDimAffinity(smc.dimAffinityMatrix.map(row => row.map(v => (typeof v === 'number' && Number.isFinite(v) ? v : 0.5))));
+    } else {
+      setSoccerDimAffinity(DEFAULT_SOCCER_DIM_AFFINITY.map(row => [...row]));
+    }
+
+    const validConceptKeys = new Set(SOCCER_CONCEPTS.map(c => c.key));
+    if (Array.isArray(smc?.activeDimensions)) {
+      const filtered = smc.activeDimensions.filter(k => validConceptKeys.has(k));
+      setActiveDimensions(filtered.length > 0 ? filtered : SOCCER_CONCEPTS.map(c => c.key));
+    } else {
+      setActiveDimensions(SOCCER_CONCEPTS.map(c => c.key));
+    }
+  }, []);
+
+  // Apply soccerModelConfig when updated externally (e.g., loading an example case from header)
+  const lastAppliedModelConfigRef = useRef<FlavourAnalysisCase['soccerModelConfig']>(undefined);
+  useEffect(() => {
+    if (isSoccerFlavour && flavourCase.soccerModelConfig && flavourCase.soccerModelConfig !== lastAppliedModelConfigRef.current) {
+      lastAppliedModelConfigRef.current = flavourCase.soccerModelConfig;
+      applySoccerModelConfig(flavourCase.soccerModelConfig);
+    }
+  }, [isSoccerFlavour, flavourCase.soccerModelConfig, applySoccerModelConfig]);
+
   // Memoize parsed match data object exclusively for soccer flavour (no cached fallback on initial load)
   const parsedSoccerMatchData = useMemo(() => {
     if (!isSoccerFlavour) return null;
@@ -978,9 +1065,15 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
           relativeConfig: soccerRelativeConfig,
           equalizationConfig: soccerEqualizationConfig,
           dimensionOverrides,
+          propagationConfigs: soccerPropagationConfigs,
+          blockingConfigs: soccerBlockingConfigs,
+          synergyConfigs: soccerSynergyConfigs,
+          relativeConfigs: soccerRelativeConfigs,
+          equalizationConfigs: soccerEqualizationConfigs,
           owaConfig: soccerOwaConfig,
           dimAffinityMatrix: soccerDimAffinity,
-          activeDimensions
+          activeDimensions,
+          soccerAnalysisCalculated
         }
       };
     }
@@ -1000,44 +1093,11 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
     try {
       const parsed = await readJsonFile(file);
       const restored = parseFlavourCase(parsed, flavourCase.flavour);
-      onUpdateFlavourCase(() => restored);
-
-      if (isSoccerFlavour && restored.soccerModelConfig) {
-        const smc = restored.soccerModelConfig;
-        if (smc.activeSoccerTab === 'segments' || smc.activeSoccerTab === 'integral') {
-          setActiveSoccerTab(smc.activeSoccerTab);
-        }
-        if (typeof smc.selectedSegmentId === 'string') {
-          setSelectedSegmentId(smc.selectedSegmentId);
-        }
-        if (smc.propagationConfig) {
-          setSoccerPropagationConfig(smc.propagationConfig);
-        }
-        if (smc.blockingConfig) {
-          setSoccerBlockingConfig(smc.blockingConfig);
-        }
-        if (smc.synergyConfig) {
-          setSoccerSynergyConfig(smc.synergyConfig);
-        }
-        if (smc.relativeConfig) {
-          setSoccerRelativeConfig(smc.relativeConfig);
-        }
-        if (smc.equalizationConfig) {
-          setSoccerEqualizationConfig(smc.equalizationConfig);
-        }
-        if (smc.dimensionOverrides && typeof smc.dimensionOverrides === 'object') {
-          setDimensionOverrides(smc.dimensionOverrides);
-        }
-        if (smc.owaConfig && typeof smc.owaConfig === 'object') {
-          setSoccerOwaConfig(smc.owaConfig);
-        }
-        if (Array.isArray(smc.dimAffinityMatrix)) {
-          setSoccerDimAffinity(smc.dimAffinityMatrix);
-        }
-        if (Array.isArray(smc.activeDimensions) && smc.activeDimensions.length > 0) {
-          setActiveDimensions(smc.activeDimensions);
-        }
+      if (isSoccerFlavour) {
+        lastAppliedModelConfigRef.current = restored.soccerModelConfig;
+        applySoccerModelConfig(restored.soccerModelConfig);
       }
+      onUpdateFlavourCase(() => restored);
 
       setNotice({
         kind: 'success',
@@ -1124,7 +1184,7 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
         config: {
           propagationConfig: soccerPropagationConfig,
           blockingConfig: soccerBlockingConfig,
-          synergyConfigs: soccerSynergyConfigs,
+          synergyConfigs: effectiveSoccerSynergyConfigs,
           relativeConfig: soccerRelativeConfig,
           equalizationConfig: soccerEqualizationConfig,
           owaConfig: soccerOwaConfig,
@@ -1153,8 +1213,11 @@ export const FlavourPage: React.FC<FlavourPageProps> = ({
       sourceUrl: DEFAULT_SOCCER_MATCH_URL,
       matchDataJson: undefined,
       description: '',
+      soccerModelConfig: undefined,
       updatedAt: new Date().toISOString()
     }));
+    lastAppliedModelConfigRef.current = undefined;
+    applySoccerModelConfig(undefined);
     setActiveConcept(null);
     setActiveSoccerPhase(0);
     setIsNewAnalysisConfirmOpen(false);

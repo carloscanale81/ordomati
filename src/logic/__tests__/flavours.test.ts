@@ -1058,3 +1058,78 @@ test('computeSoccerAggregatedAnalysis and integral analysis respect activeDimens
   assert.ok(integralRes.awayPlayers.length > 0);
   assert.ok(integralRes.matchMvp);
 });
+
+test('serializeFlavourCase and parseFlavourCase preserve complete soccerModelConfig including activeDimensions, OWA, functions, overrides, and input data', () => {
+  const matchData = createRecreationMatchData2007644();
+  const originalCase = {
+    version: '1.0.0',
+    flavour: 'match-soccer-mvp' as const,
+    description: 'Análisis táctico con subconjunto de dimensiones',
+    sourceUrl: 'https://es.whoscored.com/matches/2007644/live/spain-argentina',
+    matchDataJson: JSON.stringify(matchData),
+    updatedAt: '2026-11-27T08:00:00.000Z',
+    soccerModelConfig: {
+      activeSoccerTab: 'integral' as const,
+      selectedSegmentId: 'home-seg-1',
+      propagationConfig: { type: 'gaussian', l: 0.5 },
+      blockingConfig: { type: 'power', p: 2 },
+      synergyConfig: { type: 'factor', k: 1.25 },
+      relativeConfig: { type: 'byMinutes' },
+      equalizationConfig: { type: 'target', obj: 1.0 },
+      dimensionOverrides: {
+        goals: { propagation: true, blocking: false, synergy: true, relative: false, equalization: true },
+        touches: { propagation: false, blocking: true, synergy: false, relative: true, equalization: false }
+      },
+      propagationConfigs: {
+        goals: { type: 'maxRatio' }
+      },
+      blockingConfigs: {
+        touches: { type: 'none' }
+      },
+      synergyConfigs: {
+        goals: { type: 'factor', k: 2.0 }
+      },
+      relativeConfigs: {
+        touches: { type: 'none' }
+      },
+      equalizationConfigs: {
+        goals: { type: 'max' }
+      },
+      owaConfig: {
+        type: 'specialist',
+        weights: [...SOCCER_OWA_PRESETS.specialist]
+      },
+      dimAffinityMatrix: DEFAULT_SOCCER_DIM_AFFINITY.map(r => [...r]),
+      activeDimensions: ['goals', 'touches', 'clearances'] as SoccerConcept[],
+      soccerAnalysisCalculated: true
+    }
+  };
+
+  const json = serializeFlavourCase(originalCase);
+  const restored = parseFlavourCase(JSON.parse(json), 'match-soccer-mvp');
+
+  assert.equal(restored.flavour, 'match-soccer-mvp');
+  assert.equal(restored.description, originalCase.description);
+  assert.equal(restored.sourceUrl, originalCase.sourceUrl);
+  assert.equal(restored.matchDataJson, originalCase.matchDataJson);
+  assert.ok(restored.soccerModelConfig);
+
+  const smc = restored.soccerModelConfig!;
+  assert.equal(smc.activeSoccerTab, 'integral');
+  assert.equal(smc.selectedSegmentId, 'home-seg-1');
+  assert.deepEqual(smc.activeDimensions, ['goals', 'touches', 'clearances']);
+  assert.deepEqual(smc.owaConfig, originalCase.soccerModelConfig.owaConfig);
+  assert.deepEqual(smc.dimAffinityMatrix, originalCase.soccerModelConfig.dimAffinityMatrix);
+  assert.deepEqual(smc.propagationConfig, originalCase.soccerModelConfig.propagationConfig);
+  assert.deepEqual(smc.blockingConfig, originalCase.soccerModelConfig.blockingConfig);
+  assert.deepEqual(smc.synergyConfig, originalCase.soccerModelConfig.synergyConfig);
+  assert.deepEqual(smc.relativeConfig, originalCase.soccerModelConfig.relativeConfig);
+  assert.deepEqual(smc.equalizationConfig, originalCase.soccerModelConfig.equalizationConfig);
+  assert.deepEqual(smc.dimensionOverrides, originalCase.soccerModelConfig.dimensionOverrides);
+  assert.deepEqual(smc.propagationConfigs, originalCase.soccerModelConfig.propagationConfigs);
+  assert.deepEqual(smc.blockingConfigs, originalCase.soccerModelConfig.blockingConfigs);
+  assert.deepEqual(smc.synergyConfigs, originalCase.soccerModelConfig.synergyConfigs);
+  assert.deepEqual(smc.relativeConfigs, originalCase.soccerModelConfig.relativeConfigs);
+  assert.deepEqual(smc.equalizationConfigs, originalCase.soccerModelConfig.equalizationConfigs);
+  assert.equal(smc.soccerAnalysisCalculated, true);
+});

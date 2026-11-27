@@ -88,6 +88,17 @@ export const SoccerIntegralMatchAnalysis: React.FC<SoccerIntegralMatchAnalysisPr
     setIsPlaying(false);
   }, [totalMinutes]);
 
+  // Reset selected concept to 'aggregate' if the currently selected dimension is deactivated
+  React.useEffect(() => {
+    if (
+      selectedConceptOrAgg !== 'aggregate' &&
+      activeDimensions &&
+      !activeDimensions.includes(selectedConceptOrAgg)
+    ) {
+      setSelectedConceptOrAgg('aggregate');
+    }
+  }, [activeDimensions, selectedConceptOrAgg]);
+
   const allEvents = useMemo(
     () => [...(timeline.homeEvents || []), ...(timeline.awayEvents || [])],
     [timeline.homeEvents, timeline.awayEvents]
